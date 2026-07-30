@@ -99,4 +99,19 @@
   # If you'd rather Stylix generate it, flip this to true and delete the
   # colorscheme line from dotfiles/nvim/lua/custom/plugins/extras.lua.
   home-manager.users.jerzy.stylix.targets.neovim.enable = false;
+
+  # ---- hyprpaper -----------------------------------------------------------
+  # Stylix's hyprpaper target only ever sets `services.hyprpaper.settings` —
+  # home-manager's hyprpaper module gates writing ~/.config/hypr/hyprpaper.conf
+  # (and starting its own systemd service) behind `services.hyprpaper.enable`,
+  # which is off by default. Without this, `image`/`imageScalingMode` above are
+  # computed but never land on disk, and the `hyprpaper` process launched by
+  # `exec-once` in dotfiles/hypr/hyprland.conf starts with no config — a blank
+  # screen. `package = null` stops home-manager's own systemd service from also
+  # being generated, since exec-once already starts the daemon; this only
+  # exists to get the config file written.
+  home-manager.users.jerzy.services.hyprpaper = {
+    enable = true;
+    package = null;
+  };
 }

@@ -36,7 +36,12 @@ in
     # Machine-specific, so Nix-managed would be fine — but keeping these as
     # dotfiles means you can tweak keybinds without a rebuild, which matters a
     # lot while you're still learning Hyprland.
-    "hypr".source = config.lib.file.mkOutOfStoreSymlink "${repo}/dotfiles/hypr";
+    #
+    # Symlinking the file, not the whole hypr/ directory: Stylix also needs to
+    # drop its own generated hyprpaper.conf into ~/.config/hypr/ (see
+    # modules/nixos/style.nix), and home-manager can't place a file inside a
+    # directory that's already a single symlink to somewhere else.
+    "hypr/hyprland.conf".source = config.lib.file.mkOutOfStoreSymlink "${repo}/dotfiles/hypr/hyprland.conf";
     # waybar is NOT symlinked — it's managed in waybar.nix so its stylesheet
     # can interpolate the Stylix colors. It's never needed on a remote server,
     # so the portability argument doesn't apply.
