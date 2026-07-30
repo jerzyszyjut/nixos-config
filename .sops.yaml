@@ -1,0 +1,26 @@
+# Which keys can decrypt which files.
+#
+# Two keys are listed for every secret:
+#   - your personal key, so YOU can edit secrets on any machine
+#   - the host key, so the MACHINE can decrypt them at boot
+#
+# Both must be filled in before `sops secrets/secrets.yaml` will work.
+# docs/SECRETS.md walks through generating them.
+
+keys:
+  # Your personal age key. Get the public half with:
+  #   age-keygen -o ~/.config/sops/age/keys.txt      (first time only)
+  #   age-keygen -y ~/.config/sops/age/keys.txt
+  - &admin_jerzy age1REPLACE_WITH_YOUR_PERSONAL_PUBLIC_KEY
+
+  # Derived from the machine's SSH host key, which only exists after the first
+  # boot. Get it with:
+  #   nix-shell -p ssh-to-age --run 'ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub'
+  - &host_thinkpad age1REPLACE_WITH_HOST_PUBLIC_KEY
+
+creation_rules:
+  - path_regex: secrets/[^/]+\.yaml$
+    key_groups:
+      - age:
+          - *admin_jerzy
+          - *host_thinkpad

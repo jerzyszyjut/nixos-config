@@ -1,0 +1,10 @@
+result
+result-*
+*.hm-bak
+
+# Never commit decrypted secret material.
+secrets/*.dec
+secrets/*.plain
+*.conf.plain
+**/keys.txt
+*.age
