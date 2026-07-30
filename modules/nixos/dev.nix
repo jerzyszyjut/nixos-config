@@ -31,12 +31,12 @@
       libGL
       glfw
       libxkbcommon
-      xorg.libX11
-      xorg.libXext
-      xorg.libXrender
-      xorg.libXi
-      xorg.libXrandr
-      xorg.libxcb
+      libx11
+      libxext
+      libxrender
+      libxi
+      libxrandr
+      libxcb
       # scientific stack
       blas
       lapack
@@ -84,7 +84,6 @@
 
     # ---- emulation / embedded --------------------------------------------
     qemu
-    rpi-imager
 
     # ---- cloud / k8s (all kept) -------------------------------------------
     kubectl
@@ -103,20 +102,6 @@
     libwebp
     zstd
 
-    # ---- typesetting: LaTeX + Typst --------------------------------------
-    # You had texlive-latex-extra, -fonts-extra, -science, -xetex,
-    # -lang-polish. texliveFull is the closest match but is ~7 GB. This custom
-    # set covers all of the above for much less. Swap to `texliveFull` if you
-    # hit a missing package and stop caring.
-    (texlive.withPackages (ps: with ps; [
-      scheme-medium
-      latexmk
-      collection-langpolish
-      collection-fontsextra
-      collection-mathscience
-      collection-latexextra
-      collection-xetex
-    ]))
     typst
     tinymist # typst language server, for nvim
   ];

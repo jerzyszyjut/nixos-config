@@ -48,16 +48,20 @@ in
   programs.git = {
     enable = true;
     lfs.enable = true;
-    userName = "Jerzy"; # TODO: from your ~/.gitconfig
-    userEmail = "you@example.com"; # TODO
-    extraConfig = {
+    settings = {
+      user.name = "jerzyszyjut";
+      user.email = "jerzy.szyjut@outlook.com";
       init.defaultBranch = "main";
       pull.rebase = true;
       push.autoSetupRemote = true;
       rerere.enabled = true;
       diff.algorithm = "histogram";
     };
-    delta.enable = true;
+  };
+
+  programs.delta = {
+    enable = true;
+    enableGitIntegration = true;
   };
 
   programs.gh.enable = true;

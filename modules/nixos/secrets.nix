@@ -24,55 +24,28 @@
   # so home/jerzy/ssh.nix works fine with no encrypted hosts file.
   # =======================================================================
 
-  # sops = {
-  #   defaultSopsFile = ../../secrets/secrets.yaml;
-  #   validateSopsFiles = false;
-  #
-  #   # Derive the decryption key from the host's SSH key: nothing extra to
-  #   # manage, no passphrase at boot.
-  #   age = {
-  #     sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-  #     keyFile = "/var/lib/sops-nix/key.txt";
-  #     generateKey = true;
-  #   };
-  #
-  #   secrets = {
-  #     # ---- eduroam ---------------------------------------------------
-  #     # Rendered into the env file below, which NetworkManager substitutes
-  #     # into the profile in net.nix. Root-only; NM runs as root.
-  #     "eduroam/identity" = { };
-  #     "eduroam/password" = { };
-  #
-  #     # ---- ssh hosts -------------------------------------------------
-  #     # Plain ssh_config text, Included by home/jerzy/ssh.nix. Keeps real
-  #     # hostnames and aliases out of a public repo while still versioning
-  #     # them. Decrypted to /run/secrets/ssh/hosts on tmpfs.
-  #     "ssh/hosts" = {
-  #       owner = config.users.users.jerzy.name;
-  #       mode = "0400";
-  #     };
-  #
-  #     # ---- personal tokens -------------------------------------------
-  #     "tokens/huggingface" = { owner = config.users.users.jerzy.name; };
-  #     "tokens/wandb" = { owner = config.users.users.jerzy.name; };
-  #     "tokens/github" = { owner = config.users.users.jerzy.name; };
-  #
-  #     # If your university VPN needs a credentials file, add it here and
-  #     # point services.openvpn at
-  #     # config.sops.secrets."openvpn/credentials".path
-  #     # "openvpn/credentials" = { };
-  #   };
-  #
-  #   # One env file assembled from several secrets, for NetworkManager.
-  #   templates."eduroam.env" = {
-  #     content = ''
-  #       EDUROAM_IDENTITY=${config.sops.placeholder."eduroam/identity"}
-  #       EDUROAM_PASSWORD=${config.sops.placeholder."eduroam/password"}
-  #     '';
-  #     owner = "root";
-  #     mode = "0400";
-  #   };
-  # };
+  sops = {
+    defaultSopsFile = ../../secrets/secrets.yaml;
+    validateSopsFiles = false;
+
+    # Derive the decryption key from the host's SSH key: nothing extra to
+    # manage, no passphrase at boot.
+    age = {
+      keyFile = "/var/lib/sops-nix/key.txt";
+      generateKey = true;
+    };
+
+    secrets = {
+      # ---- ssh hosts -------------------------------------------------
+      # Plain ssh_config text, Included by home/jerzy/ssh.nix. Keeps real
+      # hostnames and aliases out of a public repo while still versioning
+      # them. Decrypted to /run/secrets/ssh/hosts on tmpfs.
+      "ssh/hosts" = {
+        owner = config.users.users.jerzy.name;
+        mode = "0400";
+      };
+    };
+  };
 
   # These are needed to DO the setup, so they're installed unconditionally.
   environment.systemPackages = with pkgs; [

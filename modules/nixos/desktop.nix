@@ -10,7 +10,7 @@
   services.greetd = {
     enable = true;
     settings.default_session = {
-      command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd Hyprland";
+      command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd start-hyprland";
       user = "greeter";
     };
   };
@@ -119,7 +119,6 @@
     pulsemixer # older, definitely present TUI mixer
     networkmanagerapplet
     blueman
-    solaar # your Logitech receiver
   ];
 
   services.gvfs.enable = true;

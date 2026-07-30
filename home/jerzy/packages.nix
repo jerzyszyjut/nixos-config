@@ -22,10 +22,6 @@
     spotify
     vlc
     qbittorrent
-    kdePackages.kolourpaint # tiny; drop it too if you never open it
-    libreoffice-fresh
-    hunspell
-    hunspellDicts.en_US
     # hunspellDicts.pl_PL  # check: nix search nixpkgs hunspellDicts
 
     # ---- editors ---------------------------------------------------------
@@ -59,6 +55,7 @@
     # ncspot  # you kept the Spotify GUI; re-add if you change your mind
 
     # ---- languages & package managers ------------------------------------
+    tree-sitter # nvim-treesitter compiles parsers with this
     uv # your Python workflow; works because of nix-ld in dev.nix
     (python313.withPackages (ps: with ps; [ debugpy pynvim ]))
     nodejs_22
