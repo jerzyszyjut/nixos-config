@@ -13,6 +13,7 @@ in
     ./apps.nix
     ./waybar.nix
     ./packages.nix
+    ./backup.nix
   ];
 
   home.username = "jerzy";

@@ -738,7 +738,6 @@ do
     },
     ruff = {},
     ts_ls = {},
-    texlab = {}, -- LaTeX
     tinymist = {}, -- Typst
     marksman = {}, -- Markdown
     nil_ls = {}, -- Nix, for editing this repo

@@ -76,8 +76,6 @@
   };
 
   # ---- PDF: zathura ------------------------------------------------------
-  # Vim keys, and it speaks SyncTeX — with `latexmk -pvc` you get a live
-  # preview that jumps between the rendered PDF and the source in Neovim.
   # Okular stays installed (packages.nix) for annotating.
   programs.zathura = {
     enable = true;
@@ -85,8 +83,6 @@
       selection-clipboard = "clipboard";
       adjust-open = "best-fit";
       recolor = true; # dark mode for papers; the colours come from Stylix
-      synctex = true;
-      synctex-editor-command = "nvim --headless -c \"VimtexInverseSearch %{line} '%{input}'\"";
     };
   };
 
@@ -117,6 +113,30 @@
     };
     # extraAccounts = { ... };   # -> credentials belong in sops, not here
   };
+
+  # ---- Claude Code: notifications -----------------------------------------
+  # ~/.claude/settings.json is app state, not a dotfile — Claude Code itself
+  # writes to it (enabledPlugins, theme, etc.), so it's NOT symlinked from the
+  # Nix store the way dotfiles/ is; a read-only symlink would block those
+  # writes. Instead, merge just this one key on every `nrs`/`home-manager
+  # switch`, leaving everything else the app has written alone.
+  #
+  # "notifications_disabled" turns off Claude Code's own desktop/terminal-bell
+  # notifications (the OSC 9/99 escape sequences it sends kitty on permission
+  # prompts / turn completion) — undocumented but present in the shipped
+  # binary alongside "terminal_bell", "iterm2", "ghostty", etc. This is
+  # separate from the fish `done` plugin below, which still notifies on long
+  # commands generally.
+  home.activation.claudeDisableNotifications = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    settings="$HOME/.claude/settings.json"
+    if [ -f "$settings" ]; then
+      $DRY_RUN_CMD ${pkgs.jq}/bin/jq '.preferredNotifChannel = "notifications_disabled"' "$settings" > "$settings.tmp" \
+        && $DRY_RUN_CMD mv "$settings.tmp" "$settings"
+    else
+      $DRY_RUN_CMD mkdir -p "$HOME/.claude"
+      $DRY_RUN_CMD ${pkgs.jq}/bin/jq -n '{preferredNotifChannel: "notifications_disabled"}' > "$settings"
+    fi
+  '';
 
   # ---- Neovim ------------------------------------------------------------
   # Deliberately NOT using programs.neovim: that module wants to generate

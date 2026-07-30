@@ -75,6 +75,18 @@
     flex
     gperf
 
+    # ---- C/C++ side-project tooling ---------------------------------------
+    # CLIs only — no test/benchmark libraries here on purpose. Catch2/GTest/
+    # gbenchmark headers on NixOS aren't on the compiler's search path from a
+    # plain shell anyway (no FHS), so they belong in a per-project devShell,
+    # not global packages. Use `nix flake init -t ~/nixos-config#cpp` in a new
+    # project directory — see templates/cpp/flake.nix.
+    ccache # wire in per-project via CMAKE_CXX_COMPILER_LAUNCHER=ccache
+    cppcheck # static analysis, catches more than clang-tidy on some bugs
+    include-what-you-use
+    bear # generates compile_commands.json for non-CMake build systems
+    conan # C/C++ dependency manager
+
     # The GCC-bootstrap libs you had installed by hand. These really belong in
     # per-project devShells, but they're here so nothing breaks on day one.
     gmp

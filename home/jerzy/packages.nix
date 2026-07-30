@@ -10,6 +10,19 @@
 #
 # Verified-good names are left active.
 
+let
+  # Zotero bundles an older Firefox/Gecko runtime that renders a black window
+  # under native Wayland (the global MOZ_ENABLE_WAYLAND=1 in default.nix is
+  # meant for real Firefox). Forcing it onto XWayland fixes it.
+  zoteroXwayland = pkgs.symlinkJoin {
+    name = "zotero-xwayland";
+    paths = [ pkgs.zotero ];
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+    postBuild = ''
+      wrapProgram $out/bin/zotero --unset MOZ_ENABLE_WAYLAND
+    '';
+  };
+in
 {
   home.packages = with pkgs; [
     # ---- GUI apps you kept ----------------------------------------------
@@ -24,8 +37,16 @@
     qbittorrent
     # hunspellDicts.pl_PL  # check: nix search nixpkgs hunspellDicts
 
+    # ---- studying ---------------------------------------------------------
+    # Vault/library paths and setup steps (Better BibTeX plugin, Typst
+    # citation export) are in docs/STUDY-SETUP.md.
+    obsidian
+    anki
+    zoteroXwayland # `zotero-xwayland/apps/zotero.desktop`; wrapped to fix a black window on Wayland
+
     # ---- editors ---------------------------------------------------------
     vscode # keeping this as the GUI fallback; drop if nvim sticks
+    zed-editor # trying this out
     # Cursor dropped per your call.
 
     # ---- Claude Code -----------------------------------------------------
@@ -76,7 +97,6 @@
     pyright
     ruff
     typescript-language-server # was nodePackages.*; that scope was removed
-    texlab # LaTeX LSP
     marksman # Markdown LSP
     markdownlint-cli
     bash-language-server
@@ -94,5 +114,14 @@
     nix-tree # find out what's eating your disk
     nh # nicer nixos-rebuild frontend
     nix-output-monitor
+    comma # `, cowsay hi` — run a package once without installing it
+    cachix # push/pull a personal binary cache for slow local builds
+
+    # ---- backup ------------------------------------------------------------
+    # The systemd service/timer wiring is in home/jerzy/backup.nix; these are
+    # just the CLIs. One-time setup (rclone remote, restic password) is in
+    # docs/BACKUP.md.
+    restic
+    rclone
   ];
 }

@@ -13,6 +13,8 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 | **[docs/KEYBINDS.md](docs/KEYBINDS.md)** | Every keybind: Hyprland, kitty, zellij, Neovim, yazi, zathura |
 | **[docs/SECRETS.md](docs/SECRETS.md)** | sops-nix: encrypted credentials committed safely to git |
 | **[docs/MAINTENANCE.md](docs/MAINTENANCE.md)** | Rebuilding, updating, rollback, "where do I change X", troubleshooting |
+| **[docs/BACKUP.md](docs/BACKUP.md)** | restic + rclone: daily encrypted backup to Google Drive |
+| **[docs/STUDY-SETUP.md](docs/STUDY-SETUP.md)** | Obsidian/Anki/Zotero vault locations, Zotero → Typst citations |
 
 ## The stack
 
@@ -28,7 +30,10 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 | PDF | zathura for reading, okular for annotating |
 | Files | yazi |
 | Mail | Thunderbird, with aerc alongside |
-| Writing | LaTeX (texlive subset) + Typst |
+| Writing | Typst |
+| Studying | Obsidian, Anki, Zotero (+ Better BibTeX) |
+| C/C++ | gcc/clang, cmake/ninja, ccache, cppcheck, conan globally; Catch2/GTest/gbenchmark via `nix flake init -t #cpp` |
+| Backup | restic + rclone → Google Drive, daily systemd timer |
 | Theme | Stylix — Gruvbox Material dark medium |
 | Secrets | sops-nix, age keys derived from the SSH host key |
 | Networking | Tailscale, NetworkManager + iwd |
@@ -77,7 +82,7 @@ hosts/thinkpad/               bootloader, power, battery thresholds
 modules/nixos/
   base.nix                    nix settings, locale, keyd, user
   desktop.nix                 Hyprland, portals, audio, fonts, fcitx5, firefox
-  dev.nix                     nix-ld, docker, toolchains, texlive, typst
+  dev.nix                     nix-ld, docker, toolchains, C/C++, typst
   net.nix                     NetworkManager, tailscale, eduroam
   secrets.nix                 sops-nix declarations
   style.nix                   Stylix: one scheme + font for everything
@@ -87,10 +92,12 @@ home/jerzy/
   waybar.nix                  bar layout and stylesheet
   ssh.nix                     hosts, multiplexing, port forwards
   packages.nix                user packages and language servers
+  backup.nix                  restic + rclone systemd service/timer
 dotfiles/
   hypr/hyprland.conf          WM layout, animations, keybinds
   nvim/                       patched kickstart.nvim
   fish/ btop/ lazygit/        drop your existing configs here
+templates/cpp/                 `nix flake init -t #cpp` — CMake + Catch2/GTest devShell
 secrets/secrets.yaml          encrypted, safe to commit
 ```
 
@@ -104,6 +111,7 @@ that can only exist on your machine:
 |---|---|---|
 | Wallpaper | `modules/nixos/style.nix` | first boot — add the image, `git add` it, uncomment two lines |
 | Secrets (eduroam, SSH hosts, tokens) | `modules/nixos/secrets.nix` and `net.nix` | [docs/SECRETS.md](docs/SECRETS.md) steps 1–3 |
+| Backup timer runs, but has no repo to write to | `home/jerzy/backup.nix` | [docs/BACKUP.md](docs/BACKUP.md) — needs a browser for the Google Drive OAuth step |
 
 Both are Nix **path literals**, which must exist at evaluation time — pointing
 one at a missing file fails the entire build rather than just that feature. That

@@ -109,18 +109,11 @@ require('venv-selector').setup {}
 map('n', '<leader>vs', '<cmd>VenvSelect<cr>', { desc = 'Select venv' })
 
 -- ===========================================================================
--- LATEX + TYPST
+-- TYPST
 -- ===========================================================================
--- vimtex must be configured BEFORE it loads, hence the vim.g assignments
--- first. Wired to the zathura config in home/jerzy/apps.nix, so forward and
--- inverse search both work.
-vim.g.vimtex_view_method = 'zathura'
-vim.g.vimtex_compiler_method = 'latexmk'
-vim.g.vimtex_quickfix_mode = 0
-vim.pack.add { gh 'lervag/vimtex' }
-
 vim.pack.add { gh 'chomosuke/typst-preview.nvim' }
 require('typst-preview').setup { dependencies_bin = { tinymist = 'tinymist' } }
+map('n', '<leader>tp', '<cmd>TypstPreviewToggle<cr>', { desc = 'Typst: toggle preview' })
 
 -- ===========================================================================
 -- GIT — the magit-equivalent

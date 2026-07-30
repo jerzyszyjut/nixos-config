@@ -40,27 +40,18 @@
     };
 
     # ---- wallpaper -------------------------------------------------------
-    # I can't include the Windows XP "Bliss" image — it's a copyrighted
-    # Microsoft photograph. Save your own copy as modules/nixos/wallpaper.jpg.
-    #
     # It's 1600x1200 (4:3) and your panel isn't, so scaling matters:
     #   "fill"    crop to cover the screen — what you want for Bliss
     #   "fit"     letterbox with bars
     #   "stretch" distort to fit
-    # DISABLED so the config evaluates out of the box. A Nix path literal must
-    # exist at EVALUATION time, so pointing at a missing file fails the whole
-    # build — not just the wallpaper.
     #
     # To enable, after first boot:
     #   cp yourimage.jpg modules/nixos/wallpaper.jpg
     #   git add modules/nixos/wallpaper.jpg      # flakes only see tracked files
     # then uncomment both lines below.
     #
-    # imageScalingMode: "fill" crops to cover (right for a 4:3 image on a 16:10
-    # panel), "fit" letterboxes, "stretch" distorts.
-    #
-    # image = ./wallpaper.jpg;
-    # imageScalingMode = "fill";
+    image = ./wallpaper.jpg;
+    imageScalingMode = "fill";
 
     fonts = {
       monospace = {

@@ -69,5 +69,13 @@
           }
         ];
       };
+
+      # `nix flake init -t ~/nixos-config#cpp` in an empty directory to start a
+      # new C++ project with CMake + Catch2/GTest/gbenchmark + clangd wired up
+      # as a devShell, instead of installing those globally.
+      templates.cpp = {
+        path = ./templates/cpp;
+        description = "C++ project: CMake, Catch2/GTest/gbenchmark, clangd devShell";
+      };
     };
 }

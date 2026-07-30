@@ -180,18 +180,15 @@ env described in `lua/custom/plugins/init.lua`.
 | `<leader>hs` / `<leader>hr` | Stage / reset hunk (gitsigns) |
 | `]c` / `[c` | Next / previous hunk |
 
-### LaTeX (vimtex)
+### Typst
 
 | Key | Action |
 |---|---|
-| `<leader>ll` | Start continuous compilation |
-| `<leader>lv` | Forward search — jump to this line in zathura |
-| `<leader>lc` | Clean auxiliary files |
-| `<leader>le` | Show compile errors |
-| `dse` / `cse` | Delete / change surrounding environment |
-| `]]` / `[[` | Next / previous section |
+| `<leader>tp` | Toggle live preview (typst-preview.nvim, opens in browser) |
 
-Inverse search works too: `Ctrl` + click in zathura jumps to the source line.
+`tinymist` (the Typst LSP) gives you diagnostics, hover, and completion the
+same as any other language server — no separate compile step needed for
+editing; the preview compiles on save.
 
 ### Sessions
 
@@ -240,7 +237,6 @@ want; `Q` is the escape hatch.
 | `r` | Rotate |
 | `Ctrl` `R` | Invert colours |
 | `f` | Follow link |
-| `Ctrl` + click | Jump to LaTeX source (SyncTeX) |
 | `q` | Quit |
 
 Dark recolouring is on by default, which is what you want for reading papers at
