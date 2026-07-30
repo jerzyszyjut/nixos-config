@@ -9,7 +9,7 @@
     ./hardware-configuration.nix
   ];
 
-  networking.hostName = "thinkpad"; # TODO: your actual hostname
+  networking.hostName = "thinkpad";
 
   # ---- filesystem options ------------------------------------------------
   # nixos-generate-config records `subvol=` but drops performance options, so
@@ -56,14 +56,25 @@
   services.tlp = {
     enable = true;
     settings = {
-      START_CHARGE_THRESH_BAT0 = 75;
-      STOP_CHARGE_THRESH_BAT0 = 80;
       CPU_SCALING_GOVERNOR_ON_AC = "performance";
       CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
+
+      CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
+      CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
+
+      CPU_MIN_PERF_ON_AC = 0;
+      CPU_MAX_PERF_ON_AC = 100;
+      CPU_MIN_PERF_ON_BAT = 0;
+      CPU_MAX_PERF_ON_BAT = 20;
+
+      START_CHARGE_THRESH_BAT0 = 40; # Starts charging when below 40%
+      STOP_CHARGE_THRESH_BAT0 = 80;  # Stops charging when reaching 80
     };
   };
   # tlp and power-profiles-daemon fight each other. Only one.
   services.power-profiles-daemon.enable = false;
+  powerManagement.powertop.enable = true;
+  services.thermald.enable = true;
 
   system.stateVersion = "26.05";
 }
