@@ -69,6 +69,7 @@ in
     tokei
     tealdeer # tldr pages
     entr # run a command when files change
+    unzip
 
     # ---- TUI tools -------------------------------------------------------
     lazydocker

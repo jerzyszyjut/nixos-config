@@ -18,12 +18,47 @@
   };
 
   # ---- OpenVPN -----------------------------------------------------------
-  # You have openvpn installed, presumably for university/work access. Point
-  # this at your .ovpn once you know which one you need.
-  # services.openvpn.servers.uni = {
-  #   config = "config /etc/openvpn/uni.ovpn";
-  #   autoStart = false;
-  # };
+  # WETI (Gdańsk Tech faculty) VPN. ca cert + tls-auth key are static VPN
+  # material (not personal credentials), so they're plain files in this repo
+  # under files/openvpn/, copied into the world-readable Nix store like any
+  # other package. The username/password ARE personal credentials — those go
+  # through sops instead of authUserPass's attrset form, which the module
+  # docs warn writes plaintext into the store. See docs/SECRETS.md to add the
+  # openvpn/uni_userpass value, then flip autoStart if you want it always on.
+  services.openvpn.servers.uni = {
+    config = ''
+      dev tap
+      proto tcp-client
+      persist-key
+      persist-tun
+      replay-persist cur-replay-protection.cache
+      nobind
+      remote 153.19.55.234 1194
+      pull
+      tls-client
+      cipher AES-256-CBC
+      ns-cert-type server
+      tls-auth ${./files/openvpn/ta_delli50.key} 1
+      ca ${./files/openvpn/CA_WETI_2020.crt}
+      verb 3
+      tls-cipher "DEFAULT:@SECLEVEL=0"
+    '';
+    authUserPass = config.sops.secrets."openvpn/uni_userpass".path;
+    autoStart = false;
+  };
+
+  # The openvpn module already sets Restart = "always" on this unit, but the
+  # systemd default RestartSec (100ms) fires the retry before the WETI server
+  # has let go of the previous handshake attempt, so it fails again straight
+  # away. This is the "start it, wait, start it again" workaround you do by
+  # hand — a longer RestartSec gives the server the moment it needs, and the
+  # raised start-limit keeps a couple of expected failures from landing the
+  # unit in "failed" before the automatic retry gets there.
+  systemd.services."openvpn-uni" = {
+    serviceConfig.RestartSec = "10s";
+    startLimitIntervalSec = 120;
+    startLimitBurst = 6;
+  };
 
   environment.systemPackages = with pkgs; [
     wireguard-tools

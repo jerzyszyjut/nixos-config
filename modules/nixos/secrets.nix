@@ -44,6 +44,15 @@
         owner = config.users.users.jerzy.name;
         mode = "0400";
       };
+
+      # ---- openvpn ------------------------------------------------------
+      # Two lines, decrypted to /run/secrets/openvpn/uni_userpass: username
+      # on line 1, password on line 2 — exactly what OpenVPN's
+      # `auth-user-pass <file>` wants. Owned by root since the openvpn
+      # systemd service runs as root. Referenced by net.nix.
+      "openvpn/uni_userpass" = {
+        mode = "0400";
+      };
     };
   };
 
