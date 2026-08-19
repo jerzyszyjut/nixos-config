@@ -43,9 +43,33 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
+
+    # Default WirePlumber bluez settings favour compatibility over quality.
+    # This is what makes the WH-1000XM5 actually sound good: AAC/LDAC are
+    # already compiled into nixpkgs' pipewire (bluez5 codec support is on by
+    # default on Linux), so the only thing missing is telling the bluez
+    # monitor to negotiate the better codecs and use wideband speech (mSBC)
+    # for the mic instead of the crunchy 8kHz HSP/HFP fallback that the mute
+    # button forces you into on a Meet call.
+    wireplumber.extraConfig."51-bluez-headset-quality" = {
+      "monitor.bluez.properties" = {
+        "bluez5.enable-sbc-xq" = true;
+        "bluez5.enable-msbc" = true;
+        "bluez5.enable-hw-volume" = true;
+        "bluez5.roles" = [ "a2dp_sink" "a2dp_source" "hsp_hs" "hsp_ag" "hfp_hf" "hfp_ag" ];
+      };
+    };
   };
 
-  hardware.bluetooth.enable = true;
+  hardware.bluetooth = {
+    enable = true;
+    settings.General = {
+      # Lets BlueZ report headset battery percentage (org.bluez.Battery1) —
+      # blueman-manager and waybar's bluetooth tooltip both show it once set.
+      Experimental = true;
+      FastConnectable = true;
+    };
+  };
 
 
   # ---- fonts -------------------------------------------------------------

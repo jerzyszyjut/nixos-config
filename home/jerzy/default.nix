@@ -119,6 +119,8 @@ in
     enable = true;
     nix-direnv.enable = true;
     enableFishIntegration = true;
+    # Auto-source .env in any directory you cd into, no .envrc needed there.
+    config.global.load_dotenv = true;
   };
 
   # ---- atuin -------------------------------------------------------------
@@ -150,6 +152,10 @@ in
   # GTK, Qt, icon and cursor theming are all owned by Stylix now — see
   # modules/nixos/style.nix. Declaring them here as well would conflict.
 
+  # `uv tool install` puts shims in ~/.local/bin (uv's default tool bin dir,
+  # $UV_TOOL_BIN_DIR), which isn't on PATH by default under home-manager.
+  home.sessionPath = [ "$HOME/.local/bin" ];
+
   home.sessionVariables = {
     EDITOR = "nvim";
     VISUAL = "nvim";
@@ -159,5 +165,36 @@ in
     NIXOS_OZONE_WL = "1";
     ELECTRON_OZONE_PLATFORM_HINT = "auto";
     MOZ_ENABLE_WAYLAND = "1";
+
+    # Duplicated from modules/nixos/dev.nix's environment.variables.
+    # LD_LIBRARY_PATH: that NixOS-level one lands in /etc/set-environment,
+    # which only reaches PAM login sessions — it never actually made it into
+    # the graphical (greetd -> Hyprland -> kitty -> fish) session on this
+    # machine (verified: EDITOR from home.sessionVariables DID show up in
+    # Hyprland's own environ, but LD_LIBRARY_PATH from environment.variables
+    # did not). home-manager's session vars go through hm-session-vars.sh,
+    # which demonstrably does reach the real shell, so set it here too.
+    LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
+      stdenv.cc.cc.lib # libstdc++ — the one everything needs
+      zlib
+      zstd
+      openssl
+      curl
+      libxml2
+      glib
+      glibc
+      xz
+      libGL
+      glfw
+      libxkbcommon
+      libx11
+      libxext
+      libxrender
+      libxi
+      libxrandr
+      libxcb
+      blas
+      lapack
+    ]);
   };
 }

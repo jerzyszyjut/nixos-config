@@ -43,6 +43,16 @@
     ];
   };
 
+  # nix-ld's shim only kicks in for foreign binaries whose ELF interpreter got
+  # rewritten — it does nothing for a Nix-built python (e.g. the one `uv`
+  # picks up from PATH at /etc/profiles/.../bin/python3.13) loading a
+  # manylinux wheel's compiled .so (tokenizers, numpy, torch, ...). That's a
+  # native dynamic-link lookup, so it needs the same libraries on
+  # LD_LIBRARY_PATH instead of NIX_LD_LIBRARY_PATH. Safe to set globally:
+  # Nix binaries resolve their own deps via RPATH first, so this only adds a
+  # fallback search path, it doesn't shadow anything.
+  environment.variables.LD_LIBRARY_PATH = lib.makeLibraryPath config.programs.nix-ld.libraries;
+
   # ---- containers --------------------------------------------------------
   virtualisation.docker = {
     enable = true;

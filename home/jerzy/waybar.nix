@@ -32,6 +32,7 @@ in
       modules-left = [ "hyprland/workspaces" "hyprland/submap" "hyprland/window" ];
       modules-center = [ "clock" ];
       modules-right = [
+        "privacy"
         "idle_inhibitor"
         "cpu"
         "memory"
@@ -76,6 +77,20 @@ in
             today = "<span color='${c.base08}'><b>{}</b></span>";
           };
         };
+      };
+
+      # Only renders an icon while something is actually live — invisible the
+      # rest of the time. "screenshare" is PipeWire's generic Stream/Input/Video
+      # class, which is what a webcam capture shows up as too, so this is your
+      # at-a-glance "is Meet actually seeing/hearing me" check.
+      privacy = {
+        icon-spacing = 4;
+        icon-size = 16;
+        transition-duration = 250;
+        modules = [
+          { type = "screenshare"; tooltip = true; tooltip-icon-size = 20; }
+          { type = "audio-in"; tooltip = true; tooltip-icon-size = 20; }
+        ];
       };
 
       idle_inhibitor = {
@@ -248,6 +263,24 @@ in
 
       #idle_inhibitor.activated {
         color: ${c.base08};
+      }
+
+      #privacy {
+        padding: 0 2px;
+      }
+
+      #privacy-item {
+        padding: 0 6px;
+        color: ${c.base00};
+        border-radius: 7px;
+      }
+
+      #privacy-item.screenshare {
+        background: ${c.base0E};
+      }
+
+      #privacy-item.audio-in {
+        background: ${c.base08};
       }
 
       #tray {
