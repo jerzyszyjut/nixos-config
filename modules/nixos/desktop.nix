@@ -15,6 +15,15 @@
     };
   };
 
+  # Without this, kernel and systemd unit-start messages print straight to
+  # tty1 during boot and are still sitting there behind/around tuigreet when
+  # it starts. Plymouth takes the console over for the boot sequence and
+  # clears it cleanly before greetd draws the login prompt.
+  boot.plymouth.enable = true;
+  boot.consoleLogLevel = 3;
+  boot.kernelParams = [ "quiet" "udev.log_priority=3" ];
+  boot.initrd.verbose = false;
+
   services.gnome.gnome-keyring.enable = true;
   security.pam.services.greetd.enableGnomeKeyring = true;
 
@@ -70,6 +79,13 @@
       FastConnectable = true;
     };
   };
+
+  # Registers blueman's D-Bus mechanism service (org.blueman.Mechanism), which
+  # blueman-manager needs for privileged actions — pairing, trusting,
+  # connecting. Just having the `blueman` package on PATH isn't enough: without
+  # this, the GUI opens but those actions silently fail. This module also pulls
+  # in the `blueman` package itself, so it's dropped from systemPackages below.
+  services.blueman.enable = true;
 
 
   # ---- fonts -------------------------------------------------------------
@@ -142,7 +158,6 @@
     #          # check: nix search nixpkgs wiremix
     pulsemixer # older, definitely present TUI mixer
     networkmanagerapplet
-    blueman
   ];
 
   services.gvfs.enable = true;

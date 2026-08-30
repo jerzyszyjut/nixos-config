@@ -126,6 +126,24 @@
 
     typst
     tinymist # typst language server, for nvim
+
+    # ---- LaTeX -------------------------------------------------------------
+    # For conference manuscripts (CVF/IEEE templates), which Typst can't do.
+    # scheme-medium is ~2GB and covers latexmk/bibtex/Times + the recommended
+    # collection; the extras below live in collection-latexextra, which medium
+    # omits, and are exactly what the CVF wacv.sty/cvpr.sty templates pull in.
+    # Add a name here rather than jumping to texliveFull (~7GB) -- find the
+    # provider of a missing foo.sty with: nix run nixpkgs#texlive.bin.texfindpkg -- query foo.sty
+    (texliveMedium.withPackages (ps: with ps; [
+      cleveref # \cref/\Cref, required by wacv.sty
+      enumitem # \begin{itemize}[leftmargin=*] etc.
+      multirow # multi-row table cells
+      makecell # line breaks inside table cells
+      silence # wacv.sty uses it to mute template warnings
+      lineno # review-mode line numbers in CVF templates
+    ]))
+
+    poppler-utils # pdfinfo/pdftotext -- check page counts against page limits
   ];
 
   # Dropped per your call: aircrack-ng, dsniff, nmap, wireshark, steam,
