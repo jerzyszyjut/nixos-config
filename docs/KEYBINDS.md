@@ -24,8 +24,9 @@ you're in a remote Neovim.
 | `Super` `F` | Fullscreen |
 | `Super` `T` | Toggle floating |
 | `Super` `P` | Pseudo-tile |
-| `Super` `1`–`5` | Switch workspace |
-| `Super` `Shift` `1`–`5` | Send window to workspace |
+| `Super` `1`–`5` | Switch workspace — always on the laptop panel |
+| `Super` `6`–`9` | Switch workspace — always on the external screen |
+| `Super` `Shift` `1`–`9` | Send window to workspace |
 | `Super` `Tab` | Focus the next monitor |
 | `Super` `Shift` `Tab` | Send window to the next monitor |
 | `Super` `V` | Clipboard history (cliphist → fuzzel) |
@@ -36,12 +37,25 @@ you're in a remote Neovim.
 
 Hardware keys (volume, brightness, media) work as labelled.
 
-External screens **extend** rather than mirror — a monitor plugged in now sits
-to the right of the laptop panel and carries its own workspaces, which is why
-the two `Tab` bindings above exist. `hyprctl monitors` shows the layout as
-Hyprland resolved it; the rules themselves are at the top of
-`dotfiles/hypr/hyprland.conf`, including how to mirror on purpose for a
-projector.
+External screens **extend** rather than mirror — a monitor plugged in sits to
+the right of the laptop panel and carries its own workspaces. Those workspaces
+are pinned to outputs, so a number key always means the same physical place:
+1-5 is the laptop, 6-9 is the external screen, and pressing one moves focus to
+that screen by itself. Unplug the monitor and 6-9 fall back onto the laptop.
+
+`hyprctl monitors` shows the layout as Hyprland resolved it; the rules are at
+the top of `dotfiles/hypr/hyprland.conf`, including how to mirror on purpose
+for a projector.
+
+**If a newly-plugged screen stays black**, Hyprland has it but has not
+advertised it to Wayland clients, so the wallpaper and bar never land on it
+(`grim -o <NAME>` answering `unknown output` confirms this). Cycling the
+output fixes it without a logout:
+
+```
+hyprctl keyword monitor "DP-1,disable"
+hyprctl keyword monitor "DP-1,3840x2160@60,auto-right,1.5"
+```
 
 `hyprctl binds` lists every binding as Hyprland actually parsed it. Use it when
 a key seems dead — a duplicate binding silently loses to whichever came last.
