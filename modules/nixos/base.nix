@@ -56,10 +56,15 @@
     isNormalUser = true;
     description = "jerzy";
     shell = pkgs.fish;
+    # Profile-specific memberships are appended by the profile that needs
+    # them (list options merge), so this list stays valid on a machine that
+    # enables neither profile: "docker" comes from modules/profiles/work.nix,
+    # "media" from modules/profiles/entertainment.nix. Listing a group that
+    # no module creates makes useradd fail at activation, which is why they
+    # are not simply hardcoded here.
     extraGroups = [
       "wheel"
       "networkmanager"
-      "docker"
       "video"
       "input"
       "dialout"

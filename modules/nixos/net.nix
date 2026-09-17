@@ -11,6 +11,29 @@
   };
   networking.wireless.iwd.enable = true;
 
+  # ---- DNS ---------------------------------------------------------------
+  # DHCP hands out the ISP's resolvers (UPC gave 195.58.161.123 and
+  # 212.186.211.21). `dns = "none"` tells NetworkManager not to write those
+  # into /etc/resolv.conf, so resolvconf writes only the list below —
+  # Cloudflare, v4 and v6.
+  #
+  # The trade-off: the router is no longer asked anything, so the `search
+  # home` domain it hands out stops resolving and you lose reaching other
+  # devices on the LAN by name. If you ever want that back, drop
+  # `dns = "none"` and use `networking.networkmanager.insertNameservers`
+  # instead — that puts Cloudflare first and keeps the DHCP servers behind it.
+  #
+  # Tailscale (logged out today) would take precedence while it's up if you
+  # enable MagicDNS: it points resolv.conf at 100.100.100.100 through this
+  # same resolvconf mechanism, and forwards anything non-tailnet onward.
+  networking.networkmanager.dns = "none";
+  networking.nameservers = [
+    "1.1.1.1"
+    "1.0.0.1"
+    "2606:4700:4700::1111"
+    "2606:4700:4700::1001"
+  ];
+
   # ---- Tailscale ---------------------------------------------------------
   services.tailscale = {
     enable = true;

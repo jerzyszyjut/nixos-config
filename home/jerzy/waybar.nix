@@ -36,7 +36,6 @@ in
         "idle_inhibitor"
         "cpu"
         "memory"
-        "temperature"
         "pulseaudio"
         "backlight"
         "network"
@@ -115,12 +114,26 @@ in
         interval = 5;
       };
 
-      temperature = {
-        critical-threshold = 85;
-        format = "{icon} {temperatureC}°";
-        format-icons = [ "" "" "" ];
-        interval = 5;
-      };
+      # Temperature is deliberately NOT on the bar. Waybar's temperature
+      # module defaults to `thermal-zone = 0`, and on this machine zone 0 is
+      # INT3400 — the Intel DPTF *controller*, not a thermometer. It reports a
+      # fixed ~20°C that looks plausible and is meaningless, which is worse
+      # than showing nothing: it reads as "cool" while the package sits at
+      # 70°C+ and the fans spin up.
+      #
+      # To put it back correctly, add "temperature" to modules-right above and
+      # uncomment this. hwmon-path-abs points at the coretemp platform device
+      # rather than a thermal zone number, because zone numbering is not
+      # stable across boots while this path is:
+      #
+      #   temperature = {
+      #     hwmon-path-abs = "/sys/devices/platform/coretemp.0/hwmon";
+      #     input-filename = "temp1_input";   # "Package id 0"
+      #     critical-threshold = 85;
+      #     format = "{icon} {temperatureC}°";
+      #     format-icons = [ "" "" "" ];
+      #     interval = 5;
+      #   };
 
       pulseaudio = {
         format = "{icon}  {volume}%";
@@ -239,7 +252,7 @@ in
         font-weight: 500;
       }
 
-      #cpu, #memory, #temperature, #pulseaudio, #backlight,
+      #cpu, #memory, #pulseaudio, #backlight,
       #network, #bluetooth, #battery, #idle_inhibitor {
         color: ${c.base05};
         padding: 0 9px;
@@ -247,14 +260,12 @@ in
 
       #cpu        { color: ${c.base0C}; }
       #memory     { color: ${c.base0E}; }
-      #temperature{ color: ${c.base09}; }
       #pulseaudio { color: ${c.base0D}; }
       #backlight  { color: ${c.base0A}; }
       #network    { color: ${c.base0B}; }
       #bluetooth  { color: ${c.base0D}; }
       #battery    { color: ${c.base0B}; }
 
-      #temperature.critical,
       #battery.critical {
         color: ${c.base08};
       }

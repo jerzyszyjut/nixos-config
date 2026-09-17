@@ -9,20 +9,11 @@
 #   nix search nixpkgs <name>
 #
 # Verified-good names are left active.
+#
+# WHAT BELONGS HERE: things you would want on any machine of yours, whichever
+# profile it runs. Development tooling went to home/jerzy/work.nix, players and
+# media to home/jerzy/entertainment.nix — see modules/profiles/.
 
-let
-  # Zotero bundles an older Firefox/Gecko runtime that renders a black window
-  # under native Wayland (the global MOZ_ENABLE_WAYLAND=1 in default.nix is
-  # meant for real Firefox). Forcing it onto XWayland fixes it.
-  zoteroXwayland = pkgs.symlinkJoin {
-    name = "zotero-xwayland";
-    paths = [ pkgs.zotero ];
-    nativeBuildInputs = [ pkgs.makeWrapper ];
-    postBuild = ''
-      wrapProgram $out/bin/zotero --unset MOZ_ENABLE_WAYLAND
-    '';
-  };
-in
 {
   home.packages = with pkgs; [
     # ---- GUI apps you kept ----------------------------------------------
@@ -30,29 +21,11 @@ in
     # (uBlock Origin, Bitwarden) can be force-installed via policy.
     kdePackages.okular # annotation; zathura handles daily reading
     thunderbird # aerc is configured in apps.nix, try it gradually
-    slack
-    discord
-    spotify
-    vlc
-    qbittorrent
+    # qbittorrent (the GUI) is deliberately NOT here any more: the
+    # entertainment profile runs qbittorrent-nox as a system service, and two
+    # clients fighting over the same peer port is a bad afternoon. Its web UI
+    # is at http://localhost:8080.
     # hunspellDicts.pl_PL  # check: nix search nixpkgs hunspellDicts
-
-    # ---- studying ---------------------------------------------------------
-    # Vault/library paths and setup steps (Better BibTeX plugin, Typst
-    # citation export) are in docs/STUDY-SETUP.md.
-    obsidian
-    anki
-    zoteroXwayland # `zotero-xwayland/apps/zotero.desktop`; wrapped to fix a black window on Wayland
-
-    # ---- editors ---------------------------------------------------------
-    vscode # keeping this as the GUI fallback; drop if nvim sticks
-    zed-editor # trying this out
-    # Cursor dropped per your call.
-
-    # ---- Claude Code -----------------------------------------------------
-    # You have ~/.claude and ~/.claude.json already. Pairs with
-    # coder/claudecode.nvim — see the notes at the bottom of apps.nix.
-    unstable.claude-code
 
     # ---- terminal toolkit ------------------------------------------------
     eza
@@ -71,45 +44,24 @@ in
     entr # run a command when files change
     unzip
 
-    # ---- TUI tools -------------------------------------------------------
-    lazydocker
-    # gitui  # you already have lazygit; re-add if you want a second opinion
-    # ncspot  # you kept the Spotify GUI; re-add if you change your mind
-
-    # ---- languages & package managers ------------------------------------
-    tree-sitter # nvim-treesitter compiles parsers with this
-    uv # your Python workflow; works because of nix-ld in dev.nix
-    (python313.withPackages (ps: with ps; [ debugpy pynvim ]))
-    nodejs_22
-    yarn
-    cookiecutter
-    postgresql # psql client + the libpq headers you had via libpq-dev
-
     # ---- Neovim ----------------------------------------------------------
     # kickstart uses `vim.pack`, Neovim's built-in plugin manager, which needs
     # 0.12+. If `nvim --version` shows 0.11 on stable, uncomment the unstable
     # line and comment out the base.nix entry instead.
     # unstable.neovim
+    tree-sitter # nvim-treesitter compiles parsers with this
 
-    # ---- language servers for nvim ---------------------------------------
-    # These replace everything mason would otherwise download. Adding a server
-    # means adding it here AND to the `servers` table in dotfiles/nvim/init.lua.
+    # Language-agnostic servers only — nvim should still be a usable editor on
+    # a machine with no work profile. The per-language ones are in work.nix.
     lua-language-server
-    pyright
-    ruff
-    typescript-language-server # was nodePackages.*; that scope was removed
     marksman # Markdown LSP
     markdownlint-cli
     bash-language-server
-    yaml-language-server # your k8s manifests
-    # dockerfile-language-server-nodejs  # renamed? nix search nixpkgs dockerfile-language
-    vscode-langservers-extracted # jsonls, html, css
-    # Debug adapters, also normally installed by mason:
     stylua # conform.nvim calls this for Lua formatting
-    # clangd comes from clang-tools in dev.nix
-    # tinymist (Typst LSP) is in dev.nix
 
     # ---- Nix tooling -----------------------------------------------------
+    # Not in a profile on purpose: this is what you maintain THIS repo with,
+    # so it has to exist on every machine the repo is deployed to.
     nixpkgs-fmt
     nil # Nix LSP, for editing this repo in nvim
     nix-tree # find out what's eating your disk

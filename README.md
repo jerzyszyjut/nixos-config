@@ -15,6 +15,7 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 | **[docs/MAINTENANCE.md](docs/MAINTENANCE.md)** | Rebuilding, updating, rollback, "where do I change X", troubleshooting |
 | **[docs/BACKUP.md](docs/BACKUP.md)** | restic + rclone: daily encrypted backup to Google Drive |
 | **[docs/STUDY-SETUP.md](docs/STUDY-SETUP.md)** | Obsidian/Anki/Zotero vault locations, Zotero → Typst citations |
+| **[docs/MEDIA.md](docs/MEDIA.md)** | The film stack: what to open, the one-time wiring, and why seeding is off |
 
 ## The stack
 
@@ -33,12 +34,48 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 | Writing | Typst |
 | Studying | Obsidian, Anki, Zotero (+ Better BibTeX) |
 | C/C++ | gcc/clang, cmake/ninja, ccache, cppcheck, conan globally; Catch2/GTest/gbenchmark via `nix flake init -t #cpp` |
+| Films | Seerr → Radarr → Prowlarr → qBittorrent → Jellyfin, one Homepage dashboard over the lot; seeding off |
 | Backup | restic + rclone → Google Drive, daily systemd timer |
 | Theme | Stylix — Gruvbox Material dark medium |
 | Secrets | sops-nix, age keys derived from the SSH host key |
 | Networking | Tailscale, NetworkManager + iwd |
 
 Caps Lock is Escape system-wide via `keyd`, including in the TTY.
+
+## Profiles: work and entertainment
+
+One repo, two halves, chosen per machine. Nothing is copied or deleted to move
+between them — a host says what it wants and Nix builds only that:
+
+```nix
+# flake.nix
+thinkpad = mkHost {
+  hostModule = ./hosts/thinkpad;
+  profiles = { work.enable = true; entertainment.enable = true; };
+};
+
+# a future machine that only ever plays films
+kino = mkHost {
+  hostModule = ./hosts/kino;
+  profiles.entertainment.enable = true;
+};
+```
+
+| | `profiles.work` | `profiles.entertainment` |
+|---|---|---|
+| System | nix-ld, Docker, C/C++ and k8s CLIs, LaTeX/Typst | Seerr, Radarr, Prowlarr, qBittorrent, FlareSolverr, Jellyfin, Homepage |
+| Home | editors, language servers, uv/node, Slack, Obsidian/Anki/Zotero | jellyfin-media-player, mpv, vlc, Spotify, Discord |
+
+What is **outside** both profiles is what you want on any machine you own: the
+user, Hyprland, the Stylix theme, WiFi, secrets, the terminal toolkit, and the
+Nix tooling this repo is maintained with.
+
+Each profile is a single module declaring `profiles.<name>.enable` and wrapping
+its whole config in `mkIf`. The Home Manager half reads the same option through
+`osConfig`, so the one line in `flake.nix` moves both halves at once — there is
+no second switch to keep in sync. Group memberships that only make sense with a
+profile on (`docker`, `media`) are declared by that profile too, because
+`useradd` fails on a group no module created.
 
 ## Design decisions
 
@@ -79,19 +116,24 @@ refuses to cooperate at all.
 flake.nix                     inputs, host wiring
 .sops.yaml                    which keys decrypt which secrets
 hosts/thinkpad/               bootloader, power, battery thresholds
-modules/nixos/
+modules/nixos/                ALWAYS ON — every machine gets these
   base.nix                    nix settings, locale, keyd, user
   desktop.nix                 Hyprland, portals, audio, fonts, fcitx5, firefox
-  dev.nix                     nix-ld, docker, toolchains, C/C++, typst
   net.nix                     NetworkManager, tailscale, eduroam
   secrets.nix                 sops-nix declarations
   style.nix                   Stylix: one scheme + font for everything
+modules/profiles/             OPT-IN — picked per host in flake.nix
+  work.nix                    nix-ld, docker, toolchains, C/C++, typst, k8s
+  entertainment.nix           the film stack + Homepage dashboard
 home/jerzy/
   default.nix                 shell, git, atuin, direnv, dotfile symlinks
   apps.nix                    kitty, zellij, zathura, yazi, aerc
   waybar.nix                  bar layout and stylesheet
   ssh.nix                     hosts, multiplexing, port forwards
-  packages.nix                user packages and language servers
+  packages.nix                packages every machine gets
+  work.nix                    editors, language servers, Slack, study apps
+  entertainment.nix           players, Spotify, Discord
+  zotero.nix                  Zotero, wrapped onto XWayland
   backup.nix                  restic + rclone systemd service/timer
 dotfiles/
   hypr/hyprland.conf          WM layout, animations, keybinds

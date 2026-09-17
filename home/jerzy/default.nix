@@ -14,6 +14,14 @@ in
     ./waybar.nix
     ./packages.nix
     ./backup.nix
+
+    # Both of these are wrapped in `lib.mkIf osConfig.profiles.<name>.enable`,
+    # so they can be imported unconditionally — a host that does not enable
+    # the profile simply gets nothing from them. Importing conditionally is
+    # not an option anyway: `imports` is evaluated before `config`, so it
+    # cannot depend on an option's value.
+    ./work.nix
+    ./entertainment.nix
   ];
 
   home.username = "jerzy";
@@ -166,35 +174,10 @@ in
     ELECTRON_OZONE_PLATFORM_HINT = "auto";
     MOZ_ENABLE_WAYLAND = "1";
 
-    # Duplicated from modules/nixos/dev.nix's environment.variables.
-    # LD_LIBRARY_PATH: that NixOS-level one lands in /etc/set-environment,
-    # which only reaches PAM login sessions — it never actually made it into
-    # the graphical (greetd -> Hyprland -> kitty -> fish) session on this
-    # machine (verified: EDITOR from home.sessionVariables DID show up in
-    # Hyprland's own environ, but LD_LIBRARY_PATH from environment.variables
-    # did not). home-manager's session vars go through hm-session-vars.sh,
-    # which demonstrably does reach the real shell, so set it here too.
-    LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
-      stdenv.cc.cc.lib # libstdc++ — the one everything needs
-      zlib
-      zstd
-      openssl
-      curl
-      libxml2
-      glib
-      glibc
-      xz
-      libGL
-      glfw
-      libxkbcommon
-      libx11
-      libxext
-      libxrender
-      libxi
-      libxrandr
-      libxcb
-      blas
-      lapack
-    ]);
+    # LD_LIBRARY_PATH used to be repeated here. It is a work-profile concern
+    # (it exists for manylinux wheels), so it moved to home/jerzy/work.nix,
+    # where it is derived from programs.nix-ld.libraries instead of being a
+    # second hand-maintained copy of the same list.
+
   };
 }
