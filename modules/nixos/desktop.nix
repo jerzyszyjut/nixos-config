@@ -88,6 +88,32 @@
   services.blueman.enable = true;
 
 
+  # ---- Logitech wireless -------------------------------------------------
+  # Installs solaar plus the udev rules that let a normal user talk HID++ to a
+  # Unifying/Bolt receiver. Without the rules the receiver still works for a
+  # mouse that is ALREADY paired, but you cannot pair a new one, read battery
+  # level, or see which devices a receiver holds — every one of those needs
+  # raw hidraw access that is root-only by default.
+  #
+  # `solaar show` is the diagnostic: it lists what the receiver has paired.
+  # An empty list with the receiver present means the mouse is not talking to
+  # it — flat battery, power switch off, or paired to a different receiver.
+  hardware.logitech.wireless = {
+    enable = true;
+    enableGraphical = true; # the tray app, for pairing without the CLI
+  };
+
+  # Unifying receivers are notorious for USB autosuspend: the kernel powers
+  # the receiver down, and the mouse then either lags on first movement or
+  # stops working entirely until replugged. `powerManagement.powertop.enable`
+  # in hosts/thinkpad/default.nix runs `powertop --auto-tune` at boot, which
+  # sets power/control=auto on every USB device indiscriminately — this rule
+  # pins the receiver back to "on" whenever it appears, which wins because it
+  # runs on the device's own add event rather than once at boot.
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="046d", ATTR{idProduct}=="c52b", TEST=="power/control", ATTR{power/control}="on"
+  '';
+
   # ---- fonts -------------------------------------------------------------
   fonts = {
     enableDefaultPackages = true;
