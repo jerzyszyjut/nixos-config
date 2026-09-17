@@ -26,6 +26,8 @@ you're in a remote Neovim.
 | `Super` `P` | Pseudo-tile |
 | `Super` `1`–`5` | Switch workspace |
 | `Super` `Shift` `1`–`5` | Send window to workspace |
+| `Super` `Tab` | Focus the next monitor |
+| `Super` `Shift` `Tab` | Send window to the next monitor |
 | `Super` `V` | Clipboard history (cliphist → fuzzel) |
 | `Print` | Screenshot focused window → clipboard |
 | `Shift` `Print` | Screenshot region → clipboard |
@@ -33,6 +35,13 @@ you're in a remote Neovim.
 | `Super` + right-drag | Resize window with mouse |
 
 Hardware keys (volume, brightness, media) work as labelled.
+
+External screens **extend** rather than mirror — a monitor plugged in now sits
+to the right of the laptop panel and carries its own workspaces, which is why
+the two `Tab` bindings above exist. `hyprctl monitors` shows the layout as
+Hyprland resolved it; the rules themselves are at the top of
+`dotfiles/hypr/hyprland.conf`, including how to mirror on purpose for a
+projector.
 
 `hyprctl binds` lists every binding as Hyprland actually parsed it. Use it when
 a key seems dead — a duplicate binding silently loses to whichever came last.
