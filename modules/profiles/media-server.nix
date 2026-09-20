@@ -200,6 +200,11 @@ in
       # the directory never appears, and the unit then dies on a missing
       # EnvironmentFile five times until systemd gives up. The visible
       # symptom is a crash loop; the cause is one wrong word here.
+      # Shelfmark's settings. Owned by cwa:media because the container runs
+      # as those ids — the same PUID/PGID pair /run/cwa.env hands to CWA.
+      "/var/lib/shelfmark".d = { user = "cwa"; group = "media"; mode = "0750"; };
+      "/var/lib/shelfmark/config".d = { user = "cwa"; group = "media"; mode = "0750"; };
+
       "/var/lib/slskd".d = { user = "slskd"; group = "media"; mode = "0750"; };
       "/var/lib/slskd/slskd.env".f = { user = "slskd"; group = "media"; mode = "0600"; };
 
@@ -800,6 +805,16 @@ in
       };
 
       volumes = [
+        # Its own settings, and the reason this mount is not optional:
+        # Shelfmark keeps EVERYTHING you configure in /config — mirrors,
+        # Cloudflare bypass, download sources, the Anna's Archive key, user
+        # accounts. Without a volume that lives in the container's writable
+        # layer, which podman throws away every time the container is
+        # recreated. Since the container is recreated by any rebuild that
+        # changes its definition, the settings would silently reset on a
+        # perfectly ordinary `nixos-rebuild switch`.
+        "/var/lib/shelfmark/config:/config"
+
         "${bookIngestDir}:/cwa-book-ingest"
         # CWA's database, READ-ONLY, so the downloader can grey out books
         # the library already has instead of fetching them twice.
