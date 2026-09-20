@@ -20,12 +20,18 @@ REQUIRED=(
   .gitignore
   hosts/thinkpad/default.nix
   hosts/thinkpad/hardware-configuration.nix
+  # hosts/kino/hardware-configuration.nix is deliberately NOT listed: it can
+  # only be generated on the server itself, and the `kino` entry in flake.nix
+  # stays commented out until it exists. See docs/SERVER-INSTALL.md.
+  hosts/kino/default.nix
   modules/nixos/base.nix
   modules/nixos/desktop.nix
-  modules/nixos/dev.nix
   modules/nixos/net.nix
   modules/nixos/secrets.nix
   modules/nixos/style.nix
+  modules/profiles/work.nix
+  modules/profiles/entertainment.nix
+  modules/profiles/media-server.nix
   home/jerzy/default.nix
   home/jerzy/apps.nix
   home/jerzy/waybar.nix
@@ -39,6 +45,8 @@ REQUIRED=(
   docs/KEYBINDS.md
   docs/SECRETS.md
   docs/MAINTENANCE.md
+  docs/MEDIA.md
+  docs/SERVER-INSTALL.md
   README.md
 )
 

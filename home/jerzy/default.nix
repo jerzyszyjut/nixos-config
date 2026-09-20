@@ -15,13 +15,14 @@ in
     ./packages.nix
     ./backup.nix
 
-    # Both of these are wrapped in `lib.mkIf osConfig.profiles.<name>.enable`,
+    # All three are wrapped in `lib.mkIf osConfig.profiles.<name>.enable`,
     # so they can be imported unconditionally — a host that does not enable
     # the profile simply gets nothing from them. Importing conditionally is
     # not an option anyway: `imports` is evaluated before `config`, so it
     # cannot depend on an option's value.
     ./work.nix
     ./entertainment.nix
+    ./media-server.nix
   ];
 
   home.username = "jerzy";
@@ -168,7 +169,7 @@ in
     EDITOR = "nvim";
     VISUAL = "nvim";
     MANPAGER = "nvim +Man!";
-    # Wayland hints — matters for the Electron apps you kept (Discord, Slack,
+    # Wayland hints — matters for the Electron apps you kept (Discord,
     # Spotify, VS Code).
     NIXOS_OZONE_WL = "1";
     ELECTRON_OZONE_PLATFORM_HINT = "auto";

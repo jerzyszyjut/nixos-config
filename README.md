@@ -1,7 +1,8 @@
 # nixos
 
-Declarative NixOS configuration for a **ThinkPad E14 Gen 6 (Intel)** — a
-keyboard-driven Wayland desktop built around remote development.
+Declarative NixOS configuration for two machines: a **ThinkPad E14 Gen 6
+(Intel)** running a keyboard-driven Wayland desktop built around remote
+development, and **kino**, an always-on laptop that serves the film library.
 
 Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 
@@ -16,6 +17,7 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 | **[docs/BACKUP.md](docs/BACKUP.md)** | restic + rclone: daily encrypted backup to Google Drive |
 | **[docs/STUDY-SETUP.md](docs/STUDY-SETUP.md)** | Obsidian/Anki/Zotero vault locations, Zotero → Typst citations |
 | **[docs/MEDIA.md](docs/MEDIA.md)** | The film stack: what to open, the one-time wiring, and why seeding is off |
+| **[docs/SERVER-INSTALL.md](docs/SERVER-INSTALL.md)** | Building the media server from a bare laptop: USB, BIOS, partitioning, moving the library off the ThinkPad |
 
 ## The stack
 
@@ -42,29 +44,42 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 
 Caps Lock is Escape system-wide via `keyd`, including in the TTY.
 
-## Profiles: work and entertainment
+## Profiles
 
-One repo, two halves, chosen per machine. Nothing is copied or deleted to move
-between them — a host says what it wants and Nix builds only that:
+One repo, several machines. Nothing is copied or deleted to move between them —
+a host says what it wants and Nix builds only that:
 
 ```nix
 # flake.nix
 thinkpad = mkHost {
   hostModule = ./hosts/thinkpad;
-  profiles = { work.enable = true; entertainment.enable = true; };
+  profiles = {
+    work.enable = true;
+    entertainment.enable = true;      # the players
+    entertainment.serverHost = "kino";
+    mediaServer.enable = false;       # the services live on kino now
+  };
 };
 
-# a future machine that only ever plays films
+# the always-on box that holds the library
 kino = mkHost {
   hostModule = ./hosts/kino;
-  profiles.entertainment.enable = true;
+  profiles.mediaServer.enable = true;
 };
 ```
 
-| | `profiles.work` | `profiles.entertainment` |
-|---|---|---|
-| System | nix-ld, Docker, C/C++ and k8s CLIs, LaTeX/Typst | Seerr, Radarr, Prowlarr, qBittorrent, FlareSolverr, Jellyfin, Homepage |
-| Home | editors, language servers, uv/node, Slack, Obsidian/Anki/Zotero | jellyfin-media-player, mpv, vlc, Spotify, Discord |
+| | `profiles.work` | `profiles.entertainment` | `profiles.mediaServer` |
+|---|---|---|---|
+| System | nix-ld, Docker, C/C++ and k8s CLIs, LaTeX/Typst | — | Seerr, Radarr, Sonarr, Prowlarr, qBittorrent, FlareSolverr, Jellyfin, Homepage |
+| Home | editors, language servers, uv/node, Obsidian/Anki/Zotero | jellyfin-media-player, mpv, vlc, Spotify, Discord | `media-up`/`media-down`, the admin abbreviations, subliminal |
+
+**Why `entertainment` and `mediaServer` are separate.** They were one profile
+while the ThinkPad both hosted the library and played it. Splitting them is
+what lets the laptop keep the players when the services move to a machine that
+is actually always on: the server never builds a desktop player for a screen
+nobody looks at, and the laptop never spins up a transcoder. A host that wants
+both still works — enable the two profiles together and
+`entertainment.serverHost` stays at its `localhost` default.
 
 What is **outside** both profiles is what you want on any machine you own: the
 user, Hyprland, the Stylix theme, WiFi, secrets, the terminal toolkit, and the
@@ -116,6 +131,7 @@ refuses to cooperate at all.
 flake.nix                     inputs, host wiring
 .sops.yaml                    which keys decrypt which secrets
 hosts/thinkpad/               bootloader, power, battery thresholds
+hosts/kino/                   the media server: lid ignored, sleep masked, sshd
 modules/nixos/                ALWAYS ON — every machine gets these
   base.nix                    nix settings, locale, keyd, user
   desktop.nix                 Hyprland, portals, audio, fonts, fcitx5, firefox
@@ -124,15 +140,17 @@ modules/nixos/                ALWAYS ON — every machine gets these
   style.nix                   Stylix: one scheme + font for everything
 modules/profiles/             OPT-IN — picked per host in flake.nix
   work.nix                    nix-ld, docker, toolchains, C/C++, typst, k8s
-  entertainment.nix           the film stack + Homepage dashboard
+  entertainment.nix           options only — the players are home-manager
+  media-server.nix            the film stack + Homepage dashboard
 home/jerzy/
   default.nix                 shell, git, atuin, direnv, dotfile symlinks
   apps.nix                    kitty, zellij, zathura, yazi, aerc
   waybar.nix                  bar layout and stylesheet
   ssh.nix                     hosts, multiplexing, port forwards
   packages.nix                packages every machine gets
-  work.nix                    editors, language servers, Slack, study apps
+  work.nix                    editors, language servers, study apps
   entertainment.nix           players, Spotify, Discord
+  media-server.nix            media-up/down, admin abbreviations, subliminal
   zotero.nix                  Zotero, wrapped onto XWayland
   backup.nix                  restic + rclone systemd service/timer
 dotfiles/

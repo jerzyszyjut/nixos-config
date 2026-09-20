@@ -1,8 +1,18 @@
 # Filmy i seriale: Seerr + Radarr + Sonarr + Bazarr + Prowlarr + qBittorrent + Jellyfin
 
-Włączane przez `profiles.entertainment.enable = true` w `flake.nix`.
-Usługi: `modules/profiles/entertainment.nix`, odtwarzacze i skróty:
-`home/jerzy/entertainment.nix`.
+Włączane przez `profiles.mediaServer.enable = true` w `flake.nix`.
+Usługi: `modules/profiles/media-server.nix`, komendy administracyjne:
+`home/jerzy/media-server.nix`.
+
+**Ten dokument opisuje serwer — maszynę `kino`.** Odtwarzacze
+(jellyfin-media-player, mpv, vlc) to osobny `profiles.entertainment`
+w `modules/profiles/entertainment.nix`, włączony na ThinkPadzie. Adresy
+`localhost:…` poniżej działają **w powłoce na serwerze**; z laptopa `media`,
+`seerr` i `jf` otwierają `http://kino:…` przez Tailscale, a panele admina
+(Radarr, Prowlarr, qBittorrent) są zbindowane na loopback i z zewnątrz
+niewidoczne — `ssh kino` albo `ssh -L 7878:localhost:7878 kino`.
+
+Stawianie serwera od zera: [SERVER-INSTALL.md](SERVER-INSTALL.md).
 
 ```
 1337x ─┐         ┌─ Radarr (filmy)  ─┐        ┌─→ Jellyfin ─→ oglądasz
@@ -35,7 +45,7 @@ Gdy coś stanie: `media` (kolorowe kafelki) albo `media-status` (dlaczego).
 |---|---|
 | `media-down` | zatrzymuje wszystkie dziewięć usług |
 | `media-up` | uruchamia je z powrotem |
-| `media-autostart-off` | przestają wstawać razem z laptopem |
+| `media-autostart-off` | przestają wstawać razem z maszyną |
 | `media-autostart-on` | znów wstają przy starcie |
 
 Pierwsze dwie działają natychmiast, przez `media.target` — każda usługa jest
@@ -46,8 +56,11 @@ Dwie ostatnie są cięższe, bo **przebudowują system** (~30 s, pytają o hasł
 Nie da się inaczej: `/etc/systemd/system` to dowiązanie do `/nix/store`, więc
 `systemctl disable` i `systemctl mask` nie mają gdzie zapisać swoich symlinków.
 Na NixOS to, czy usługa wstaje przy starcie, jest elementem konfiguracji, a nie
-stanem — funkcje podmieniają linię `entertainment.autostart` w `flake.nix`
+stanem — funkcje podmieniają linię `mediaServer.autostart` w `flake.nix`
 i wołają `nixos-rebuild switch`.
+
+Na serwerze autostart normalnie zostaje włączony i nie dotykasz tych dwóch —
+przydają się, dopóki dopinasz stack.
 
 Wyłączony autostart **nie odinstalowuje** niczego. Usługi dalej są w systemie,
 `media-up` w każdej chwili je podniesie — po prostu nic nie ciągnie ich w górę
@@ -61,7 +74,7 @@ Usługi są systemowe i mają `wantedBy = multi-user.target`, więc startują sa
 przy przebudowie i przy każdym kolejnym boocie. Nie ma nic do „uruchamiania”.
 
 ```fish
-nrs                # sudo nixos-rebuild switch --flake ~/nixos-config#thinkpad
+nrs                # sudo nixos-rebuild switch --flake ~/nixos-config#kino
 media-status       # wszystkie siedem powinno być active (running)
 media              # otwiera dashboard
 ```
@@ -189,7 +202,7 @@ pobieranie) i **System → Events** (co poszło nie tak).
 
 ## Seedowanie jest wyłączone
 
-`modules/profiles/entertainment.nix` ustawia:
+`modules/profiles/media-server.nix` ustawia:
 
 ```
 Session\GlobalMaxRatio=0          zatrzymaj, gdy tylko pobieranie się skończy
@@ -218,12 +231,18 @@ o VPN-ie, nie o ustawieniu w qBittorrencie.
 
 Jellyfin, Seerr i Homepage mają zamknięty firewall dla LAN-u, ale `net.nix` ufa
 całemu interfejsowi `tailscale0`. Czyli po `tailscale up` na laptopie i na
-telefonie wchodzisz w aplikację Jellyfin i wpisujesz `http://thinkpad:8096` — i
+telefonie wchodzisz w aplikację Jellyfin i wpisujesz `http://kino:8096` — i
 to działa też z kawiarni, bez otwierania czegokolwiek na świat. Seerr pod
-`http://thinkpad:5055` pozwala zamówić film z telefonu.
+`http://kino:5055` pozwala zamówić film z telefonu.
 
-Na samym laptopie lepiej używać `jellyfin-media-player` niż przeglądarki:
-odtwarza przez wbudowanego mpv, więc dekoduje sprzętowo i wentylator milczy.
+To jest też jedyna droga z ThinkPada: Jellyfin, Seerr i Homepage słuchają na
+serwerze, nie tu. `entertainment.serverHost = "kino"` w `flake.nix` sprawia, że
+skróty `jf`, `seerr` i `media` na laptopie celują w tailnetową nazwę serwera —
+jeśli Tailscale nadał mu inną, popraw tam.
+
+Na laptopie lepiej używać `jellyfin-media-player` niż przeglądarki: odtwarza
+przez wbudowanego mpv, więc dekoduje sprzętowo i wentylator milczy. Przy
+pierwszym starcie pyta o adres serwera — `http://kino:8096`.
 
 ## Port 51413
 
@@ -255,7 +274,7 @@ homepage:
 ```
 
 potem w `modules/nixos/secrets.nix` zadeklaruj `"homepage/env"`, a w
-`entertainment.nix` dodaj do `services.homepage-dashboard`:
+`media-server.nix` dodaj do `services.homepage-dashboard`:
 
 ```nix
 environmentFiles = [ config.sops.secrets."homepage/env".path ];
@@ -290,7 +309,7 @@ ale jeśli wchodzisz po IP `100.x.y.z`, dopisz je do `allowedHosts`.
 
 **qBittorrent zapomina ustawienia.** Tak ma być. Moduł nadpisuje
 `qBittorrent.conf` z `serverConfig` przy każdym starcie, więc źródłem prawdy
-jest `modules/profiles/entertainment.nix`, nie web UI. To samo dotyczy
+jest `modules/profiles/media-server.nix`, nie web UI. To samo dotyczy
 transkodowania w Jellyfinie (`forceEncodingConfig = true`).
 
 **Miejsce na dysku.** Nic tutaj nie jest w snapshotach ani w backupie restica —
