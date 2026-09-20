@@ -191,11 +191,17 @@ in
       "/var/lib/cwa".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
       "/var/lib/cwa/config".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
       # Created empty so slskd can start before you have put credentials in
-      # it. Without the file the unit fails outright on a missing
-      # EnvironmentFile, which is a confusing way to learn you have not
-      # made a Soulseek account yet.
-      "/var/lib/slskd".d = { user = "slskd"; group = "slskd"; mode = "0750"; };
-      "/var/lib/slskd/slskd.env".f = { user = "slskd"; group = "slskd"; mode = "0600"; };
+      # it.
+      #
+      # group is "media", NOT "slskd": services.slskd.group is set to media
+      # above, so the module never creates an slskd group at all — the
+      # user's primary group IS media. Naming a group that does not exist
+      # makes systemd-tmpfiles skip the line with "Failed to resolve group",
+      # the directory never appears, and the unit then dies on a missing
+      # EnvironmentFile five times until systemd gives up. The visible
+      # symptom is a crash loop; the cause is one wrong word here.
+      "/var/lib/slskd".d = { user = "slskd"; group = "media"; mode = "0750"; };
+      "/var/lib/slskd/slskd.env".f = { user = "slskd"; group = "media"; mode = "0600"; };
 
       "/var/lib/threadfin".d = { user = "31337"; group = "31337"; mode = "0755"; };
       "/var/lib/threadfin/conf".d = { user = "31337"; group = "31337"; mode = "0755"; };
@@ -471,6 +477,14 @@ in
     # from, so it needs the same group-writable umask as qBittorrent for the
     # hardlink to be permitted. Same fs.protected_hardlinks reasoning.
     systemd.services.slskd.serviceConfig.UMask = lib.mkForce "0002";
+
+    # Belt and braces after the above: the leading "-" makes systemd treat a
+    # missing environment file as empty rather than as a fatal error. A
+    # server that has not been given Soulseek credentials yet should start
+    # and sit there unable to log in, not refuse to start and take five
+    # restarts to say so.
+    systemd.services.slskd.serviceConfig.EnvironmentFile =
+      lib.mkForce "-/var/lib/slskd/slskd.env";
 
     # ---- Navidrome -------------------------------------------------------
     # The music server, and the answer to "how do I listen to this on my
