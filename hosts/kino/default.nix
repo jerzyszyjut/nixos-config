@@ -1,13 +1,12 @@
 { config, lib, pkgs, ... }:
 
-# The media server: a laptop that sits somewhere with its lid shut and stays
-# on. Everything here is about that last sentence — a machine whose defaults
-# all assume someone is sitting in front of it, told to stop assuming that.
+# The media server: a Lenovo Legion 5 15ITH6H (82JH) that sits somewhere with
+# its lid shut and stays on. Everything here is about that last sentence — a
+# machine whose defaults all assume someone is sitting in front of it, told to
+# stop assuming that.
 #
-# Written before the hardware was in hand, so a few blocks are marked CHECK:
-# they are correct for a ThinkPad and wrong or simply absent elsewhere. The
-# build tells you — an option that does not exist is an evaluation error, not
-# a silent no-op. See docs/SERVER-INSTALL.md.
+# i5-11400H (Tiger Lake-H, 6c/12t), 16 GB, Intel UHD iGPU + RTX 3060 Mobile,
+# and two NVMe disks. See docs/SERVER-INSTALL.md.
 
 {
   imports = [
@@ -26,10 +25,20 @@
   # by editing the generated file, which stays regenerable that way. These
   # MERGE with what the generated file declares, because the option is a list.
   #
-  # @media is the one subvolume this machine has and the ThinkPad does not.
-  # compress=zstd is deliberately NOT set on it: films are already compressed
-  # and btrfs would spend CPU discovering that on every write, CPU this box
-  # would rather spend transcoding.
+  # TWO DISKS, and which is which matters:
+  #
+  #   nvme1n1  477 GB Samsung  ESP at /boot + @ @home @nix
+  #   nvme0n1  931 GB WD Blue  @media -> /var/lib/media
+  #
+  # The library gets its own disk, so a film being written never competes with
+  # the system disk, and rebuilding NixOS never touches the disk holding the
+  # only copy of anything.
+  #
+  # compress=zstd is deliberately absent on the library: films are already
+  # compressed, and btrfs would spend CPU rediscovering that on every write —
+  # CPU this box would rather spend transcoding. noatime matters more there
+  # than anywhere else, because a Jellyfin library scan reads every file and
+  # would otherwise write a metadata update for each one.
   fileSystems."/".options = [ "compress=zstd:1" "noatime" ];
   fileSystems."/home".options = [ "compress=zstd:1" "noatime" ];
   fileSystems."/nix".options = [ "compress=zstd:1" "noatime" ];
@@ -90,17 +99,10 @@
       CPU_MIN_PERF_ON_AC = 0;
       CPU_MAX_PERF_ON_AC = 100;
 
-      # CHECK: ThinkPad-only, via the tp_smapi/acpi_call interface. A battery
-      # held at 100% and warm is a battery that swells within a year or two,
-      # and this machine will never once run on it — so charge it to 60% and
-      # leave it there as a UPS that survives a brief power cut.
-      #
-      # On a non-ThinkPad these two are accepted by TLP and silently do
-      # nothing. Check with `sudo tlp-stat -b`; if the thresholds are not
-      # supported, the honest alternative is to physically remove the battery
-      # if the model allows it.
-      START_CHARGE_THRESH_BAT0 = 55;
-      STOP_CHARGE_THRESH_BAT0 = 60;
+      # No START_CHARGE_THRESH_BAT0/STOP_… here: those are the ThinkPad
+      # tp_smapi interface, and this machine does not have it — BAT0 exposes
+      # no charge_control_* attributes at all. The Legion equivalent is
+      # conservation mode, set below.
     };
   };
   services.power-profiles-daemon.enable = false;
@@ -110,6 +112,36 @@
   # devices into aggressive runtime power management, including the NIC and
   # the SATA/NVMe link. On a server that shows up as latency on the first
   # request after an idle period.
+
+  # ---- the battery -------------------------------------------------------
+  # A lithium cell held at 100% and kept warm swells, and on a laptop that is
+  # mains-powered forever the battery is doing nothing else — so cap it.
+  # `conservation_mode` is the ideapad_laptop driver's version of the
+  # ThinkPad charge thresholds: write 1 and the firmware stops charging
+  # around 60%, leaving the pack as a small UPS that rides out a brief cut.
+  #
+  # A oneshot rather than a udev rule because the attribute belongs to an
+  # ACPI platform device that exists from boot; there is no hotplug event to
+  # hang a rule on. Guarded on the path existing so a kernel that renames or
+  # drops it degrades to a no-op instead of failing the boot.
+  systemd.services.battery-conservation = {
+    description = "Cap battery charge at ~60% (Lenovo conservation mode)";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "battery-conservation" ''
+        f=/sys/bus/platform/drivers/ideapad_acpi/VPC2004:00/conservation_mode
+        if [ -w "$f" ]; then
+          echo 1 > "$f"
+          echo "conservation mode on"
+        else
+          echo "no conservation_mode attribute; battery will charge to 100%" >&2
+        fi
+      '';
+    };
+  };
 
   # ---- getting back into it ----------------------------------------------
   # This box has no keyboard you will use. SSH is how you administer it, and
@@ -133,9 +165,10 @@
   };
 
   users.users.jerzy.openssh.authorizedKeys.keys = [
-    # Paste the contents of ~/.ssh/id_ed25519.pub FROM THE THINKPAD here.
-    # Leaving this list empty and PasswordAuthentication off locks you out of
-    # your own server, so the assertion below refuses to build instead.
+    # The ThinkPad's ~/.ssh/default.pub. Leaving this list empty with
+    # PasswordAuthentication off locks you out of your own server, so the
+    # assertion below refuses to build rather than letting that happen.
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEOerpFHIIRu7bzw5wFZENu0QY9tCecVj5MdCvxTUUq7 jerzy-pg@ivan"
   ];
 
   assertions = [
@@ -159,7 +192,7 @@
   # deciding to drop a stream at 04:40.
   system.autoUpgrade = {
     enable = true;
-    flake = "github:jerzyszyjut/nixos-config#kino"; # CHECK: your repo URL
+    flake = "github:jerzyszyjut/nixos-config#kino";
     # No --update-input: it rebuilds from whatever this repo's flake.lock
     # pins, so the server runs exactly what you last pushed and tested on the
     # laptop, rather than resolving nixpkgs to something nothing has run yet.
@@ -181,10 +214,14 @@
   # btrfs scrub reads every block and verifies it against its checksum, which
   # is how you find out a film rotted BEFORE the night you sit down to watch
   # it. Monthly is the usual cadence; it is I/O-heavy, so it runs at night.
+  # Both filesystems, not just the root one: they are separate btrfs
+  # filesystems on separate disks, and a scrub covers the filesystem it is
+  # pointed at. The library is the half worth checking — it is the part with
+  # no second copy anywhere.
   services.btrfs.autoScrub = {
     enable = true;
     interval = "monthly";
-    fileSystems = [ "/" ];
+    fileSystems = [ "/" "/var/lib/media" ];
   };
 
   # Fail before the disk does. smartd mails nothing by default — check it

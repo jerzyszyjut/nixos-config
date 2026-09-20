@@ -167,30 +167,47 @@
         };
 
         # ---- the server ----------------------------------------------
-        # The always-on laptop that holds the library. Bring it up with
-        # docs/SERVER-INSTALL.md: it walks the whole thing from writing the
-        # USB stick to the first `nixos-install`, and ends at the point where
-        # this entry is uncommented.
+        # Lenovo Legion 5 15ITH6H (82JH), always on, holds the library.
+        # docs/SERVER-INSTALL.md is how it was built.
         #
-        # It needs hosts/kino/hardware-configuration.nix, which only
-        # `nixos-generate-config` running ON that machine can write. Until
-        # that file exists this block must stay commented out — Nix cannot
-        # evaluate a host whose disks it has never seen.
-        #
-        # No `work.enable`: a headless box needs neither Docker nor LaTeX.
-        #
-        # kino = mkHost {
-        #   hostModule = ./hosts/kino;
-        #   profiles = {
-        #     mediaServer.enable = true;
-        #     # Whether the stack comes up with the machine. Not a runtime
-        #     # switch: /etc/systemd/system is a read-only store symlink, so
-        #     # `systemctl disable` has nowhere to write. The
-        #     # media-autostart-on / media-autostart-off commands rewrite
-        #     # this exact line and rebuild — keep it on one line for that.
-        #     mediaServer.autostart = true;
-        #   };
-        # };
+        # No `work.enable`: this box needs neither Docker nor LaTeX.
+        kino = mkHost {
+          hostModule = ./hosts/kino;
+
+          # No exact 15ITH6H module exists in nixos-hardware, and the nearest
+          # relative (lenovo-legion-16ithg6) is worse than nothing here — it
+          # pulls in the NVIDIA prime and Ampere driver modules, which is the
+          # opposite of what this machine wants. So the pieces are composed
+          # directly instead:
+          hardwareModules = [
+            # Tiger Lake-H: microcode, plus the whole Intel GPU stack —
+            # intel-media-driver, vpl-gpu-rt and intel-compute-runtime. That
+            # is what gives Jellyfin QuickSync transcoding, and on Gen12 it
+            # handles HEVC and tone mapping in hardware.
+            nixos-hardware.nixosModules.common-cpu-intel
+
+            # Blacklists nouveau and nvidia and then REMOVES the RTX 3060
+            # from the PCI bus via udev, along with its audio and USB-C
+            # functions. On a machine that never sleeps, an idle dGPU is
+            # 10-15 W burned continuously for a card nothing will ever draw
+            # on — this box transcodes with QuickSync and has no display
+            # workload at all.
+            nixos-hardware.nixosModules.common-gpu-nvidia-disable
+
+            # fstrim.timer for the two NVMe drives.
+            nixos-hardware.nixosModules.common-pc-ssd
+          ];
+
+          profiles = {
+            mediaServer.enable = true;
+            # Whether the stack comes up with the machine. Not a runtime
+            # switch: /etc/systemd/system is a read-only store symlink, so
+            # `systemctl disable` has nowhere to write. The
+            # media-autostart-on / media-autostart-off commands rewrite this
+            # exact line and rebuild — keep it on one line for that reason.
+            mediaServer.autostart = true;
+          };
+        };
       };
 
       # `nix flake init -t ~/nixos-config#cpp` in an empty directory to start a
