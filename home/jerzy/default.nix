@@ -100,8 +100,14 @@ in
       cat = "bat";
       ls = "eza";
       ll = "eza -l --git";
-      nrs = "sudo nixos-rebuild switch --flake ~/nixos-config#thinkpad";
-      nrt = "sudo nixos-rebuild test --flake ~/nixos-config#thinkpad";
+      # The host is interpolated, NOT hardcoded. This file is shared by every
+      # machine, so a literal `#thinkpad` here meant that typing `nrs` on the
+      # server rebuilt it as the LAPTOP — which is not a subtle failure: the
+      # activated system carries the other machine's fstab, systemd waits for
+      # UUIDs that do not exist on this disk, and the next boot lands in
+      # emergency mode. It happened exactly once and once was enough.
+      nrs = "sudo nixos-rebuild switch --flake ~/nixos-config#${osConfig.networking.hostName}";
+      nrt = "sudo nixos-rebuild test --flake ~/nixos-config#${osConfig.networking.hostName}";
     };
 
     shellAbbrs = {
