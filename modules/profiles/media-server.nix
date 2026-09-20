@@ -822,6 +822,13 @@ in
       ];
 
       ports = [ "${toString ports.bookDownloader}:8084" ];
+
+      # Makes the HOST reachable from inside the container under a stable
+      # name. Without it the only route back is the podman bridge address,
+      # and a config screen asking for a URL invites "localhost" — which
+      # inside a container is the container, so Prowlarr appears to not
+      # exist. Point Shelfmark at http://host.containers.internal:9696.
+      extraOptions = [ "--add-host=host.containers.internal:host-gateway" ];
     };
 
     virtualisation.oci-containers.containers.threadfin = {
@@ -1113,6 +1120,19 @@ in
       # never start.
       allowedTCPPorts = [ ports.torrenting ports.slskdListen ];
       allowedUDPPorts = [ ports.torrenting ]; # DHT and µTP
+
+      # Containers talking back to host services.
+      #
+      # podman0 is NOT added to trustedInterfaces, deliberately: that would
+      # let every container reach every port on this machine. Only the ports
+      # a container actually needs are opened, and only on this interface —
+      # the LAN and the internet still see nothing.
+      #
+      # Prowlarr is here because Shelfmark can use it as a book indexer
+      # source, which is the one genuinely useful thing it does beyond
+      # shadow libraries: the same indexers that already serve films and
+      # music, searched for books.
+      interfaces."podman0".allowedTCPPorts = [ ports.prowlarr ];
     };
 
     # ---- optional extras -------------------------------------------------
