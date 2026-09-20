@@ -8,7 +8,6 @@
 lib.mkIf osConfig.profiles.work.enable {
   home.packages = with pkgs; [
     # ---- GUI ---------------------------------------------------------------
-    slack
     vscode # keeping this as the GUI fallback; drop if nvim sticks
     zed-editor # trying this out
     # Cursor dropped per your call.

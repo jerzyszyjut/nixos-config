@@ -28,7 +28,7 @@
   security.pam.services.greetd.enableGnomeKeyring = true;
 
   # ---- portals -----------------------------------------------------------
-  # This plus PipeWire is what makes SCREEN SHARING work in Slack and Discord
+  # This plus PipeWire is what makes SCREEN SHARING work in Discord
   # on Wayland. Skip it and screen share silently fails.
   xdg.portal = {
     enable = true;

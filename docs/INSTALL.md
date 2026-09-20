@@ -305,7 +305,7 @@ nvim --version | head -1     # needs 0.12+
 nvim ~/nixos-config/flake.nix   # then :checkhealth vim.lsp
 
 # 4. Does screen sharing work? (portals + pipewire)
-#    Open Slack or Discord and try to share a window.
+#    Open Discord and try to share a window.
 
 # 5. Chinese input
 #    Ctrl+Space should switch to fcitx5; run fcitx5-configtool to add layouts.
