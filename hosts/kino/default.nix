@@ -87,15 +87,47 @@
     hybrid-sleep.enable = false;
   };
 
-  # ---- power -------------------------------------------------------------
-  # Plugged in permanently, so the governor stays on performance: transcoding
-  # a 4K stream is exactly the bursty load that a powersave governor ramps up
-  # for too slowly, and the viewer sees it as a stall.
+  # ---- power, heat and fan noise -----------------------------------------
+  # This block used to pin everything to `performance`, on the theory that
+  # transcoding a 4K stream is a bursty load a powersave governor ramps up
+  # for too slowly. That theory turned out to be wrong ON THIS MACHINE, and
+  # the evidence is in the QuickSync check: vainfo reports HEVC Main10
+  # decode AND encode on the iGPU, so Jellyfin transcodes on fixed-function
+  # video hardware and barely touches the CPU cores at all.
+  #
+  # What the CPU actually does here is *arr scans, a Navidrome library scan
+  # once an hour and a monthly btrfs scrub. Not one of those is latency
+  # critical, and none of them justify a machine that idles at 56 °C with
+  # the fan audible in a quiet room.
+  #
+  # So: quiet by default, with headroom still available on demand.
   services.tlp = {
     enable = true;
     settings = {
-      CPU_SCALING_GOVERNOR_ON_AC = "performance";
-      CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
+      # THE FAN LEVER. platform_profile is the Legion firmware's own fan and
+      # power curve, and it is the setting you actually hear — far more than
+      # anything the governor does. It was on "performance", which keeps the
+      # fan ready rather than keeps the chip cool; at load average 0.09 that
+      # is noise bought for nothing.
+      #
+      # "balanced" rather than "low-power" deliberately: low-power caps the
+      # package hard enough to make a library scan crawl, and the fan is
+      # already near-silent at balanced with this thermal load. If it is
+      # still too loud, low-power is the next step and costs nothing but
+      # scan speed.
+      PLATFORM_PROFILE_ON_AC = "balanced";
+
+      # With intel_pstate, "powersave" is NOT a slow mode — it is the
+      # governor that scales across the whole range, while "performance"
+      # pins the floor to the top of it. This is the ordinary choice; the
+      # previous value was the unusual one.
+      CPU_SCALING_GOVERNOR_ON_AC = "powersave";
+
+      # Bias the hardware's own P-state picker toward efficiency. Turbo is
+      # deliberately LEFT ENABLED (no CPU_BOOST_ON_AC = 0) and the ceiling
+      # stays at 100: when something does need the cores, it gets them, it
+      # just does not sit there holding them.
+      CPU_ENERGY_PERF_POLICY_ON_AC = "balance_power";
       CPU_MIN_PERF_ON_AC = 0;
       CPU_MAX_PERF_ON_AC = 100;
 
@@ -106,6 +138,13 @@
     };
   };
   services.power-profiles-daemon.enable = false;
+
+  # The safety net, and the answer to "but will it cook itself". thermald
+  # watches the package temperature and throttles before the firmware has
+  # to, independently of everything above — so the worst case of a quieter
+  # fan profile is a slower scan, not a damaged chip. The hardware's own
+  # trip points sit at 100 °C on top of that and are not negotiable by any
+  # of this.
   services.thermald.enable = true;
 
   # Deliberately NOT powertop.enable: it tunes for battery life by putting
