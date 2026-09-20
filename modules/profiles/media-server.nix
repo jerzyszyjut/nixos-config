@@ -620,13 +620,29 @@ in
         Type = "oneshot";
         RemainAfterExit = true;
         ExecStart = pkgs.writeShellScript "cwa-env" ''
-          set -eu
+          set -euo pipefail
           umask 022
-          {
-            echo "PUID=$(${pkgs.coreutils}/bin/id -u cwa)"
-            echo "PGID=$(${pkgs.coreutils}/bin/getent group media | ${pkgs.coreutils}/bin/cut -d: -f3)"
-            echo "TZ=${config.time.timeZone}"
-          } > /run/cwa.env
+
+          # /etc/group is parsed directly rather than with getent, which is
+          # NOT part of coreutils — pointing at ${"$"}{pkgs.coreutils}/bin/getent
+          # gave "No such file or directory", and because that failure
+          # happened inside a command substitution it did not stop the
+          # script: PGID came out EMPTY, the LinuxServer image fell back to
+          # its built-in gid 911, and it chowned the whole book library to a
+          # group that does not exist on this host.
+          puid="$(${pkgs.coreutils}/bin/id -u cwa)"
+          pgid="$(${pkgs.gnugrep}/bin/grep '^media:' /etc/group | ${pkgs.coreutils}/bin/cut -d: -f3)"
+
+          # Fail LOUDLY. The first version of this reported success while
+          # writing a broken file, which is how the bug above survived a
+          # reboot unnoticed.
+          if [ -z "$puid" ] || [ -z "$pgid" ]; then
+            echo "cwa-env: nie udalo sie ustalic uid cwa ($puid) albo gid media ($pgid)" >&2
+            exit 1
+          fi
+
+          ${pkgs.coreutils}/bin/printf 'PUID=%s\nPGID=%s\nTZ=%s\n' \
+            "$puid" "$pgid" "${config.time.timeZone}" > /run/cwa.env
         '';
       };
     };
