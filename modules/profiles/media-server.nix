@@ -312,7 +312,7 @@ in
       enable = true;
       settings.server = {
         port = ports.prowlarr;
-        bindaddress = "127.0.0.1";
+        bindaddress = "*";
       };
     };
 
@@ -343,7 +343,7 @@ in
       group = "media";
       settings.server = {
         port = ports.radarr;
-        bindaddress = "127.0.0.1";
+        bindaddress = "*";
       };
     };
 
@@ -364,7 +364,7 @@ in
       group = "media";
       settings.server = {
         port = ports.sonarr;
-        bindaddress = "127.0.0.1";
+        bindaddress = "*";
       };
     };
 
@@ -386,7 +386,7 @@ in
       group = "media";
       settings.server = {
         port = ports.lidarr;
-        bindaddress = "127.0.0.1";
+        bindaddress = "*";
       };
     };
 
@@ -474,7 +474,13 @@ in
       cfg="${config.services.bazarr.dataDir}/config/config.yaml"
       if [ ! -e "$cfg" ]; then
         mkdir -p "$(dirname "$cfg")"
-        printf 'general:\n  ip: 127.0.0.1\n' > "$cfg"
+        printf 'general:\n  ip: 0.0.0.0\n' > "$cfg"
+      else
+        # Bazarr writes this file itself, so the seed above only ever runs
+        # once. A config.yaml left over from when it was loopback-bound has
+        # to be corrected in place, or the change silently does nothing.
+        # Narrow on purpose: only this one value, only if it is the old one.
+        ${pkgs.gnused}/bin/sed -i 's/^\(\s*\)ip: 127\.0\.0\.1\s*$/\1ip: 0.0.0.0/' "$cfg"
       fi
     '';
 
@@ -686,7 +692,7 @@ in
       # Loopback only. Jellyfin reaches it over localhost, and the admin UI
       # is a rarely-touched config screen like Prowlarr's — reach it with
       #   ssh -L 34400:localhost:34400 kino
-      ports = [ "127.0.0.1:${toString ports.threadfin}:34400" ];
+      ports = [ "${toString ports.threadfin}:34400" ];
     };
 
     # ---- Homepage --------------------------------------------------------
@@ -732,17 +738,20 @@ in
       #
       # So the two groups differ on purpose:
       #
-      #   Jellyfin, Seerr, Navidrome, CWA   listen on 0.0.0.0, firewalled to
-      #                                     tailscale0 -> href names the host
-      #   the *arr admin UIs, qBittorrent,  bound to 127.0.0.1 and staying
-      #   Threadfin                         that way -> href stays localhost,
-      #                                     which is exactly right once you
-      #                                     run `ssh -L <port>:localhost:<port> kino`
+      # Everything here is administered over Tailscale, so every tile but
+      # one names the host. The firewall trusts tailscale0 and nothing else,
+      # and each of these services has its own login.
       #
-      # qBittorrent is the reason the second group is not simply opened up:
-      # it runs with LocalHostAuth=false, so a loopback connection needs no
-      # password at all. On tailscale0 that would be unauthenticated control
-      # of a process that can write files anywhere it can reach.
+      # qBittorrent is the exception and stays on 127.0.0.1. It runs with
+      # LocalHostAuth = false, so a loopback connection needs NO password —
+      # that is safe only while loopback is the only way in. Binding it to
+      # the tailnet without first giving it a password would hand every
+      # device on the tailnet unauthenticated control of a process that
+      # writes files wherever it can reach, and qBittorrent can be told to
+      # run a program on download completion. Reach it with
+      #   ssh -L 8080:localhost:8080 kino
+      # You will rarely want to: once Radarr drives it, its UI is for
+      # watching a transfer that is misbehaving and nothing else.
       #
       # Icon names come from the dashboard-icons project and are fetched from
       # a CDN at page load. Offline you get placeholders, nothing breaks.
@@ -791,49 +800,49 @@ in
           "Kuchnia" = [
             {
               "Radarr" = {
-                href = "http://localhost:${toString ports.radarr}";
+                href = "http://${config.networking.hostName}:${toString ports.radarr}";
                 siteMonitor = "http://localhost:${toString ports.radarr}";
-                description = "Kolejka i import — ssh -L";
+                description = "Kolejka i import";
                 icon = "radarr.png";
               };
             }
             {
               "Sonarr" = {
-                href = "http://localhost:${toString ports.sonarr}";
+                href = "http://${config.networking.hostName}:${toString ports.sonarr}";
                 siteMonitor = "http://localhost:${toString ports.sonarr}";
-                description = "Seriale: kolejka i import — ssh -L";
+                description = "Seriale: kolejka i import";
                 icon = "sonarr.png";
               };
             }
             {
               "Lidarr" = {
-                href = "http://localhost:${toString ports.lidarr}";
+                href = "http://${config.networking.hostName}:${toString ports.lidarr}";
                 siteMonitor = "http://localhost:${toString ports.lidarr}";
-                description = "Muzyka: kolejka i import — ssh -L";
+                description = "Muzyka: kolejka i import";
                 icon = "lidarr.png";
               };
             }
             {
               "Bazarr" = {
-                href = "http://localhost:${toString ports.bazarr}";
+                href = "http://${config.networking.hostName}:${toString ports.bazarr}";
                 siteMonitor = "http://localhost:${toString ports.bazarr}";
-                description = "Napisy: polskie i angielskie — ssh -L";
+                description = "Napisy: polskie i angielskie";
                 icon = "bazarr.png";
               };
             }
             {
               "Threadfin" = {
-                href = "http://localhost:${toString ports.threadfin}";
+                href = "http://${config.networking.hostName}:${toString ports.threadfin}";
                 siteMonitor = "http://localhost:${toString ports.threadfin}";
-                description = "Proxy M3U/EPG dla Jellyfin Live TV — ssh -L";
+                description = "Proxy M3U/EPG dla Jellyfin Live TV";
                 icon = "threadfin.png";
               };
             }
             {
               "Prowlarr" = {
-                href = "http://localhost:${toString ports.prowlarr}";
+                href = "http://${config.networking.hostName}:${toString ports.prowlarr}";
                 siteMonitor = "http://localhost:${toString ports.prowlarr}";
-                description = "Trackery — ssh -L";
+                description = "Trackery";
                 icon = "prowlarr.png";
               };
             }
@@ -841,7 +850,7 @@ in
               "qBittorrent" = {
                 href = "http://localhost:${toString ports.qbittorrent}";
                 siteMonitor = "http://localhost:${toString ports.qbittorrent}";
-                description = "Transfery (seedowanie wyłączone) — ssh -L";
+                description = "Transfery — ssh -L (bez hasła, patrz komentarz)";
                 icon = "qbittorrent.png";
               };
             }

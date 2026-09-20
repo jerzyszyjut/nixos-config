@@ -5,18 +5,19 @@ Same kroki. „Dlaczego" jest w [MEDIA.md](MEDIA.md).
 **Kolejność ma znaczenie** — prawie każdy krok potrzebuje klucza API
 z poprzedniego. Idź z góry na dół.
 
-Dwie grupy usług, i to samo rozróżnienie widać na kafelkach Homepage:
+**Wszystko otwierasz przez Tailscale: `http://kino:<port>`.** Kafelki na
+Homepage prowadzą tam wprost. Firewall przepuszcza wyłącznie `tailscale0`,
+więc z LAN-u ani z internetu nic nie wejdzie.
 
-| grupa | jak otworzyć |
-|---|---|
-| Jellyfin, Seerr, Navidrome, CWA, Homepage | wprost przez Tailscale: `http://kino:<port>` |
-| Radarr, Sonarr, Lidarr, Bazarr, Prowlarr, qBittorrent, Threadfin | tylko loopback → `ssh -L <port>:localhost:<port> kino`, potem `http://localhost:<port>` |
+**Jeden wyjątek: qBittorrent** (`8080`) zostaje na loopbacku, bo działa
+z `LocalHostAuth=false` — połączenie lokalne nie wymaga hasła, co jest
+bezpieczne tylko dopóki loopback jest jedyną drogą. Gdy naprawdę musisz:
 
-Kafelki drugiej grupy mają w opisie `— ssh -L` i celują w `localhost`
-**celowo**: to jest poprawny adres dokładnie wtedy, gdy masz zestawiony tunel.
+```fish
+ssh -L 8080:localhost:8080 kino    # potem http://localhost:8080
+```
 
-qBittorrent jest powodem, dla którego druga grupa zostaje na loopbacku —
-działa z `LocalHostAuth=false`, czyli połączenie lokalne nie wymaga hasła.
+W praktyce zaglądasz tam rzadko — kolejką steruje Radarr/Sonarr/Lidarr.
 
 > Klucz API każdej usługi `*arr`: **Settings → General → API Key**.
 > Będziesz go kopiował kilkanaście razy.
@@ -27,7 +28,7 @@ Całość: ~45 min.
 
 ## 1. qBittorrent — 1 min
 
-1. `qbt` → sprawdź, że UI się otwiera
+1. `ssh -L 8080:localhost:8080 kino` → otwórz `http://localhost:8080`
 2. Nic nie konfigurujesz. Login pusty, hasło puste (loopback + `LocalHostAuth=false`)
 3. Ustawienia są nadpisywane z Nixa przy każdym starcie — nie zmieniaj ich w UI
 
@@ -289,5 +290,5 @@ Dopiero **gdy film poleci z serwera**:
 | `lid` | Lidarr | 8686 |
 | `baz` | Bazarr | 6767 |
 | `prow` | Prowlarr | 9696 |
-| `qbt` | qBittorrent | 8080 |
+| `qbt` | qBittorrent | 8080 (tylko ssh -L) |
 | `tf` | Threadfin | 34400 |
