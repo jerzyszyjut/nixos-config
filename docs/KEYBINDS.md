@@ -54,7 +54,7 @@ output fixes it without a logout:
 
 ```
 hyprctl keyword monitor "DP-1,disable"
-hyprctl keyword monitor "DP-1,3840x2160@60,auto-right,1.5"
+hyprctl keyword monitor "DP-1,3840x2160@60,auto-up,1.5"
 ```
 
 `hyprctl binds` lists every binding as Hyprland actually parsed it. Use it when
