@@ -723,6 +723,27 @@ in
         hideVersion = true;
       };
 
+      # ---- href vs siteMonitor, and why they differ -------------------
+      # siteMonitor is fetched BY HOMEPAGE, which runs here — so it always
+      # says localhost. href is followed by YOUR BROWSER, which is on the
+      # laptop, so localhost there means the laptop and the link goes
+      # nowhere. This machine is headless; there is no browser on it for a
+      # localhost link to be correct in.
+      #
+      # So the two groups differ on purpose:
+      #
+      #   Jellyfin, Seerr, Navidrome, CWA   listen on 0.0.0.0, firewalled to
+      #                                     tailscale0 -> href names the host
+      #   the *arr admin UIs, qBittorrent,  bound to 127.0.0.1 and staying
+      #   Threadfin                         that way -> href stays localhost,
+      #                                     which is exactly right once you
+      #                                     run `ssh -L <port>:localhost:<port> kino`
+      #
+      # qBittorrent is the reason the second group is not simply opened up:
+      # it runs with LocalHostAuth=false, so a loopback connection needs no
+      # password at all. On tailscale0 that would be unauthenticated control
+      # of a process that can write files anywhere it can reach.
+      #
       # Icon names come from the dashboard-icons project and are fetched from
       # a CDN at page load. Offline you get placeholders, nothing breaks.
       services = [
@@ -730,7 +751,7 @@ in
           "Oglądanie" = [
             {
               "Jellyfin" = {
-                href = "http://localhost:${toString ports.jellyfin}";
+                href = "http://${config.networking.hostName}:${toString ports.jellyfin}";
                 siteMonitor = "http://localhost:${toString ports.jellyfin}";
                 description = "Biblioteka i odtwarzanie";
                 icon = "jellyfin.png";
@@ -738,7 +759,7 @@ in
             }
             {
               "Seerr" = {
-                href = "http://localhost:${toString ports.seerr}";
+                href = "http://${config.networking.hostName}:${toString ports.seerr}";
                 siteMonitor = "http://localhost:${toString ports.seerr}";
                 description = "Tu dodajesz film";
                 icon = "jellyseerr.png";
@@ -750,7 +771,7 @@ in
           "Słuchanie i czytanie" = [
             {
               "Navidrome" = {
-                href = "http://localhost:${toString ports.navidrome}";
+                href = "http://${config.networking.hostName}:${toString ports.navidrome}";
                 siteMonitor = "http://localhost:${toString ports.navidrome}";
                 description = "Muzyka — serwer Subsonic dla telefonu";
                 icon = "navidrome.png";
@@ -758,7 +779,7 @@ in
             }
             {
               "Calibre-Web" = {
-                href = "http://localhost:${toString ports.cwa}";
+                href = "http://${config.networking.hostName}:${toString ports.cwa}";
                 siteMonitor = "http://localhost:${toString ports.cwa}";
                 description = "E-booki i wysyłka na Kindle";
                 icon = "calibre-web.png";
@@ -772,7 +793,7 @@ in
               "Radarr" = {
                 href = "http://localhost:${toString ports.radarr}";
                 siteMonitor = "http://localhost:${toString ports.radarr}";
-                description = "Kolejka i import";
+                description = "Kolejka i import — ssh -L";
                 icon = "radarr.png";
               };
             }
@@ -780,7 +801,7 @@ in
               "Sonarr" = {
                 href = "http://localhost:${toString ports.sonarr}";
                 siteMonitor = "http://localhost:${toString ports.sonarr}";
-                description = "Seriale: kolejka i import";
+                description = "Seriale: kolejka i import — ssh -L";
                 icon = "sonarr.png";
               };
             }
@@ -788,7 +809,7 @@ in
               "Lidarr" = {
                 href = "http://localhost:${toString ports.lidarr}";
                 siteMonitor = "http://localhost:${toString ports.lidarr}";
-                description = "Muzyka: kolejka i import";
+                description = "Muzyka: kolejka i import — ssh -L";
                 icon = "lidarr.png";
               };
             }
@@ -796,7 +817,7 @@ in
               "Bazarr" = {
                 href = "http://localhost:${toString ports.bazarr}";
                 siteMonitor = "http://localhost:${toString ports.bazarr}";
-                description = "Napisy: polskie i angielskie";
+                description = "Napisy: polskie i angielskie — ssh -L";
                 icon = "bazarr.png";
               };
             }
@@ -804,7 +825,7 @@ in
               "Threadfin" = {
                 href = "http://localhost:${toString ports.threadfin}";
                 siteMonitor = "http://localhost:${toString ports.threadfin}";
-                description = "Proxy M3U/EPG dla Jellyfin Live TV";
+                description = "Proxy M3U/EPG dla Jellyfin Live TV — ssh -L";
                 icon = "threadfin.png";
               };
             }
@@ -812,7 +833,7 @@ in
               "Prowlarr" = {
                 href = "http://localhost:${toString ports.prowlarr}";
                 siteMonitor = "http://localhost:${toString ports.prowlarr}";
-                description = "Trackery";
+                description = "Trackery — ssh -L";
                 icon = "prowlarr.png";
               };
             }
@@ -820,7 +841,7 @@ in
               "qBittorrent" = {
                 href = "http://localhost:${toString ports.qbittorrent}";
                 siteMonitor = "http://localhost:${toString ports.qbittorrent}";
-                description = "Transfery (seedowanie wyłączone)";
+                description = "Transfery (seedowanie wyłączone) — ssh -L";
                 icon = "qbittorrent.png";
               };
             }

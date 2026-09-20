@@ -5,9 +5,18 @@ Same kroki. „Dlaczego" jest w [MEDIA.md](MEDIA.md).
 **Kolejność ma znaczenie** — prawie każdy krok potrzebuje klucza API
 z poprzedniego. Idź z góry na dół.
 
-Panele admina słuchają na loopbacku. Z laptopa:
-`ssh -L <port>:localhost:<port> kino`. Jellyfin, Seerr, Navidrome, CWA
-i Homepage otwierasz wprost przez Tailscale: `http://kino:<port>`.
+Dwie grupy usług, i to samo rozróżnienie widać na kafelkach Homepage:
+
+| grupa | jak otworzyć |
+|---|---|
+| Jellyfin, Seerr, Navidrome, CWA, Homepage | wprost przez Tailscale: `http://kino:<port>` |
+| Radarr, Sonarr, Lidarr, Bazarr, Prowlarr, qBittorrent, Threadfin | tylko loopback → `ssh -L <port>:localhost:<port> kino`, potem `http://localhost:<port>` |
+
+Kafelki drugiej grupy mają w opisie `— ssh -L` i celują w `localhost`
+**celowo**: to jest poprawny adres dokładnie wtedy, gdy masz zestawiony tunel.
+
+qBittorrent jest powodem, dla którego druga grupa zostaje na loopbacku —
+działa z `LocalHostAuth=false`, czyli połączenie lokalne nie wymaga hasła.
 
 > Klucz API każdej usługi `*arr`: **Settings → General → API Key**.
 > Będziesz go kopiował kilkanaście razy.
