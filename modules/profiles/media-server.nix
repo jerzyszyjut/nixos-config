@@ -268,15 +268,32 @@ in
             # a non-loopback bind would have been unauthenticated control of
             # a process that can run a program on download completion.
             Address = "*";
-            LocalHostAuth = true;
 
+            # STAYS false, and that is the whole point: false means
+            # "skip authentication for connections from localhost". Radarr,
+            # Sonarr and Lidarr all connect to localhost:8080 with an empty
+            # username and password, so they keep working untouched — their
+            # configs never learn that anything changed.
+            #
+            # Setting this to TRUE is what would break them, by demanding
+            # credentials they do not have.
+            #
+            # Connections from anywhere else — you, over Tailscale — do have
+            # to authenticate, using the password below.
+            LocalHostAuth = false;
+
+            # This is NOT for the *arr apps — they come in over localhost
+            # and skip auth entirely. It exists because the UI is now
+            # reachable on the tailnet, and without it the only thing
+            # standing there would be qBittorrent's default admin /
+            # adminadmin, which is not a secret.
+            #
             # PBKDF2-HMAC-SHA512, 100k iterations, 16-byte salt — the format
             # qBittorrent stores natively. It is a HASH of a 20-character
-            # random password, not the password, which is why it can live in
-            # a public repo. It has to be declared here rather than set in
-            # the UI because this module rewrites qBittorrent.conf from
-            # serverConfig on every start, so a UI-set password would be
-            # erased by the next restart.
+            # random password, so it is safe in a public repo. Declared here
+            # rather than set in the UI because this module rewrites
+            # qBittorrent.conf from serverConfig on every start, so anything
+            # set through the web interface is erased by the next restart.
             Username = "jerzy";
             Password_PBKDF2 = "@ByteArray(Y+NDjHujvj5lH2KH3aNbfw==:Cha6AYL0SGUfs95va+HZ+YK94cCFSVlALtahsunyNlD4oObzCaK6Cnbb10l0DRaUgHGLCxA6F5enRwen5eodUw==)";
 
@@ -1016,7 +1033,11 @@ in
             }
             {
               "Threadfin" = {
-                href = "http://${config.networking.hostName}:${toString ports.threadfin}";
+                # /web/ — the bare root is the HDHomeRun discovery endpoint
+                # and answers with device XML, which looks like a broken
+                # service if you open it in a browser. That XML is what
+                # Jellyfin wants; /web/ is what you want.
+                href = "http://${config.networking.hostName}:${toString ports.threadfin}/web/";
                 siteMonitor = "http://localhost:${toString ports.threadfin}";
                 description = "Proxy M3U/EPG dla Jellyfin Live TV";
                 icon = "threadfin.png";
