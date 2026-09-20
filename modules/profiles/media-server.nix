@@ -1159,6 +1159,26 @@ in
       allowedTCPPorts = [ ports.torrenting ports.slskdListen ];
       allowedUDPPorts = [ ports.torrenting ]; # DHT and µTP
 
+      # ---- Jellyfin on the LAN ------------------------------------------
+      # The one deliberate hole in the tailscale0-only rule, and it exists
+      # for a device that cannot join a tailnet: a smart TV. Jellyfin
+      # already listens on all interfaces, so this is purely the firewall
+      # letting the living room in.
+      #
+      # Only Jellyfin, and only on the wireless interface. Everything else —
+      # the *arr admin UIs, qBittorrent, Seerr, Navidrome — stays invisible
+      # from the LAN, so a guest on the wifi sees a login page and nothing
+      # else. Jellyfin has its own accounts; this is not an open door.
+      #
+      # 8096 is the web UI and the API the TV app speaks. 7359/udp is
+      # Jellyfin's client auto-discovery, which is what lets the app find
+      # the server by itself instead of you typing an address into a TV
+      # remote — worth having for exactly that reason.
+      interfaces."wlan0" = {
+        allowedTCPPorts = [ ports.jellyfin ];
+        allowedUDPPorts = [ 7359 ];
+      };
+
       # Containers talking back to host services.
       #
       # podman0 is NOT added to trustedInterfaces, deliberately: that would
