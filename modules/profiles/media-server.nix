@@ -263,8 +263,29 @@ in
             # SSH tunnel. That is also why dropping the login prompt for
             # localhost is not a hole worth worrying about — anyone who can
             # reach the port already has a shell on the box.
-            Address = "127.0.0.1";
-            LocalHostAuth = false;
+            # Reachable over Tailscale like everything else — but ONLY
+            # because it finally has a password. LocalHostAuth = false plus
+            # a non-loopback bind would have been unauthenticated control of
+            # a process that can run a program on download completion.
+            Address = "*";
+            LocalHostAuth = true;
+
+            # PBKDF2-HMAC-SHA512, 100k iterations, 16-byte salt — the format
+            # qBittorrent stores natively. It is a HASH of a 20-character
+            # random password, not the password, which is why it can live in
+            # a public repo. It has to be declared here rather than set in
+            # the UI because this module rewrites qBittorrent.conf from
+            # serverConfig on every start, so a UI-set password would be
+            # erased by the next restart.
+            Username = "jerzy";
+            Password_PBKDF2 = "@ByteArray(Y+NDjHujvj5lH2KH3aNbfw==:Cha6AYL0SGUfs95va+HZ+YK94cCFSVlALtahsunyNlD4oObzCaK6Cnbb10l0DRaUgHGLCxA6F5enRwen5eodUw==)";
+
+            # The UI is now reachable by name, so the Host header will be
+            # "kino:8080" rather than an address. qBittorrent rejects
+            # unrecognised Host headers as a DNS-rebinding defence, which
+            # shows up as a blank page rather than an error.
+            HostHeaderValidation = false;
+            CSRFProtection = true;
           };
         };
 
@@ -889,20 +910,16 @@ in
       #
       # So the two groups differ on purpose:
       #
-      # Everything here is administered over Tailscale, so every tile but
-      # one names the host. The firewall trusts tailscale0 and nothing else,
-      # and each of these services has its own login.
+      # Everything here is administered over Tailscale, so every tile names
+      # the host rather than localhost, which would mean the laptop. The
+      # firewall trusts tailscale0 and nothing else, and each of these
+      # services has its own login.
       #
-      # qBittorrent is the exception and stays on 127.0.0.1. It runs with
-      # LocalHostAuth = false, so a loopback connection needs NO password —
-      # that is safe only while loopback is the only way in. Binding it to
-      # the tailnet without first giving it a password would hand every
-      # device on the tailnet unauthenticated control of a process that
-      # writes files wherever it can reach, and qBittorrent can be told to
-      # run a program on download completion. Reach it with
-      #   ssh -L 8080:localhost:8080 kino
-      # You will rarely want to: once Radarr drives it, its UI is for
-      # watching a transfer that is misbehaving and nothing else.
+      # qBittorrent was the last holdout and is no longer: it now has a
+      # password (see Password_PBKDF2 above), which is the precondition that
+      # was missing. Exposing it while LocalHostAuth was false would have
+      # meant unauthenticated control of a process that can be told to run a
+      # program on download completion.
       #
       # Icon names come from the dashboard-icons project and are fetched from
       # a CDN at page load. Offline you get placeholders, nothing breaks.
@@ -1015,9 +1032,9 @@ in
             }
             {
               "qBittorrent" = {
-                href = "http://localhost:${toString ports.qbittorrent}";
+                href = "http://${config.networking.hostName}:${toString ports.qbittorrent}";
                 siteMonitor = "http://localhost:${toString ports.qbittorrent}";
-                description = "Transfery — ssh -L (bez hasła, patrz komentarz)";
+                description = "Transfery (seedowanie wyłączone)";
                 icon = "qbittorrent.png";
               };
             }
