@@ -42,6 +42,11 @@ let
   # the library is how you lose a collection.
   bookIngestDir = "${mediaRoot}/ingest/books";
 
+  # slskd's downloads. Under mediaRoot for the same hardlink reason as
+  # everything else: Lidarr imports finished Soulseek downloads into
+  # ${musicDir}, and that only stays cheap while both are one filesystem.
+  soulseekDir = "${mediaRoot}/soulseek";
+
   # Jellyfin's DVR writes here. Recordings are large and re-recordable, so
   # they get the same no-backup treatment as everything else under mediaRoot.
   dvrDir = "${mediaRoot}/dvr";
@@ -64,6 +69,9 @@ let
     navidrome = 4533; # LAN-closed, Tailscale-reachable: the phone needs it
     cwa = 8083; # ditto — you open this from the laptop to send to Kindle
     threadfin = 34400; # 127.0.0.1 only — Jellyfin talks to it over loopback
+    bookDownloader = 8084; # LAN-closed, Tailscale-reachable — you search here
+    slskd = 5030; # ditto — the Soulseek web UI
+    slskdListen = 50300; # the only OTHER port opened to the outside world
   };
 in
 {
@@ -162,6 +170,12 @@ in
       "${bookIngestDir}".d = { user = "cwa"; group = "media"; mode = "2775"; };
 
       "${dvrDir}".d = { user = "jellyfin"; group = "media"; mode = "2775"; };
+
+      # Soulseek downloads. Owned by slskd, group media so Lidarr can import
+      # out of here and jerzy can clean up without sudo.
+      "${soulseekDir}".d = { user = "slskd"; group = "media"; mode = "2775"; };
+      "${soulseekDir}/complete".d = { user = "slskd"; group = "media"; mode = "2775"; };
+      "${soulseekDir}/incomplete".d = { user = "slskd"; group = "media"; mode = "2775"; };
     };
 
     # State for the two containers, kept OUT of ${mediaRoot} on purpose: this
@@ -176,6 +190,13 @@ in
     systemd.tmpfiles.settings."11-media-containers" = {
       "/var/lib/cwa".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
       "/var/lib/cwa/config".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
+      # Created empty so slskd can start before you have put credentials in
+      # it. Without the file the unit fails outright on a missing
+      # EnvironmentFile, which is a confusing way to learn you have not
+      # made a Soulseek account yet.
+      "/var/lib/slskd".d = { user = "slskd"; group = "slskd"; mode = "0750"; };
+      "/var/lib/slskd/slskd.env".f = { user = "slskd"; group = "slskd"; mode = "0600"; };
+
       "/var/lib/threadfin".d = { user = "31337"; group = "31337"; mode = "0755"; };
       "/var/lib/threadfin/conf".d = { user = "31337"; group = "31337"; mode = "0755"; };
       "/var/lib/threadfin/tmp".d = { user = "31337"; group = "31337"; mode = "0755"; };
@@ -392,6 +413,64 @@ in
 
     # Same hardlink-import reason as Radarr and Sonarr.
     systemd.services.lidarr.serviceConfig.UMask = lib.mkForce "0002";
+
+    # ---- slskd (Soulseek) ------------------------------------------------
+    # The music equivalent of the book downloader below, and the answer to
+    # "where do I find Polish music that no tracker has". Soulseek is not a
+    # tracker — it is a network of people's personal music folders, which is
+    # why it is strong on exactly the material an anglophone tracker is weak
+    # on: bootlegs, live sets, Eastern European catalogue, out-of-print.
+    #
+    # slskd is the headless daemon with a web UI. It downloads into
+    # ${soulseekDir}, and Lidarr can import from there into ${musicDir}.
+    services.slskd = {
+      enable = true;
+      group = "media";
+
+      # Reachable over Tailscale like the other things you actually open.
+      openFirewall = false;
+
+      # Soulseek credentials do NOT go here — settings land in the
+      # world-readable Nix store. They come from the env file below, which
+      # you create by hand once. See docs/SETUP-CHECKLIST.md.
+      environmentFile = "/var/lib/slskd/slskd.env";
+
+      settings = {
+        web = {
+          port = ports.slskd;
+          # Listens everywhere; the firewall (tailscale0 only) is the gate,
+          # same trade as Jellyfin and Navidrome.
+          url_base = "/";
+        };
+
+        soulseek.listen_port = ports.slskdListen;
+
+        directories = {
+          downloads = "${soulseekDir}/complete";
+          incomplete = "${soulseekDir}/incomplete";
+        };
+
+        # ---- SHARING, AND WHY IT IS ON --------------------------------
+        # This is the one place in this config that deliberately sends your
+        # data OUT, and it is the opposite of the torrent decision above,
+        # where seeding is off.
+        #
+        # The reason is that Soulseek is not a swarm, it is a community with
+        # manners. Sharing nothing is visible to everyone you download from,
+        # and a large share of users auto-ban leechers outright — so a
+        # non-sharing slskd does not merely feel rude, it stops working.
+        #
+        # Only ${musicDir} is exposed. Films, books and downloads in progress
+        # are not. To turn this off, empty the list — and expect queues that
+        # never advance.
+        shares.directories = [ musicDir ];
+      };
+    };
+
+    # slskd writes into the library-adjacent tree that Lidarr then imports
+    # from, so it needs the same group-writable umask as qBittorrent for the
+    # hardlink to be permitted. Same fs.protected_hardlinks reasoning.
+    systemd.services.slskd.serviceConfig.UMask = lib.mkForce "0002";
 
     # ---- Navidrome -------------------------------------------------------
     # The music server, and the answer to "how do I listen to this on my
@@ -621,7 +700,7 @@ in
     systemd.services.cwa-env = {
       description = "Resolve uid/gid for the Calibre-Web-Automated container";
       wantedBy = [ "media.target" ];
-      before = [ "podman-cwa.service" ];
+      before = [ "podman-cwa.service" "podman-book-downloader.service" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -647,8 +726,11 @@ in
             exit 1
           fi
 
-          ${pkgs.coreutils}/bin/printf 'PUID=%s\nPGID=%s\nTZ=%s\n' \
-            "$puid" "$pgid" "${config.time.timeZone}" > /run/cwa.env
+          # Both spellings on purpose: the LinuxServer CWA image reads
+          # PUID/PGID, the downloader image reads UID/GID. One file, two
+          # conventions, no second service to keep in step.
+          ${pkgs.coreutils}/bin/printf 'PUID=%s\nPGID=%s\nUID=%s\nGID=%s\nTZ=%s\n' \
+            "$puid" "$pgid" "$puid" "$pgid" "${config.time.timeZone}" > /run/cwa.env
         '';
       };
     };
@@ -678,6 +760,39 @@ in
       # this from the laptop over Tailscale to push a book to the Kindle. The
       # firewall is what keeps the LAN out.
       ports = [ "${toString ports.cwa}:8083" ];
+    };
+
+    # ---- the book downloader ---------------------------------------------
+    # Companion to CWA, by a different author, and the piece that turns
+    # "drop a file in ingest" into "search and click". It writes into the
+    # SAME ingest folder CWA watches, so the handoff needs no wiring: you
+    # click here, the file lands in ${bookIngestDir}, CWA picks it up,
+    # fetches metadata, converts, files it, and Send-to-Kindle is one more
+    # click. Upstream calls it Shelfmark now.
+    #
+    # It searches shadow libraries — Anna's Archive and Library Genesis.
+    # That is what it is for and it is worth knowing rather than finding out.
+    virtualisation.oci-containers.containers.book-downloader = {
+      # Digest-pinned for the same reason as the other two.
+      image = "ghcr.io/calibrain/calibre-web-automated-book-downloader@sha256:9602290324993c801b319d3166b202b96bd9039af2416f0916dae03a5bdca815";
+
+      environmentFiles = [ "/run/cwa.env" ];
+      environment = {
+        # The default is already this path, but being explicit means a
+        # future image that changes the default cannot silently start
+        # writing somewhere CWA is not watching.
+        INGEST_DIR = "/cwa-book-ingest";
+        FLASK_PORT = toString ports.bookDownloader;
+      };
+
+      volumes = [
+        "${bookIngestDir}:/cwa-book-ingest"
+        # CWA's database, READ-ONLY, so the downloader can grey out books
+        # the library already has instead of fetching them twice.
+        "/var/lib/cwa/config/app.db:/auth/app.db:ro"
+      ];
+
+      ports = [ "${toString ports.bookDownloader}:8084" ];
     };
 
     virtualisation.oci-containers.containers.threadfin = {
@@ -784,6 +899,22 @@ in
                 siteMonitor = "http://localhost:${toString ports.navidrome}";
                 description = "Muzyka — serwer Subsonic dla telefonu";
                 icon = "navidrome.png";
+              };
+            }
+            {
+              "Book Downloader" = {
+                href = "http://${config.networking.hostName}:${toString ports.bookDownloader}";
+                siteMonitor = "http://localhost:${toString ports.bookDownloader}";
+                description = "Szukanie e-booków → ingest";
+                icon = "calibre-web.png";
+              };
+            }
+            {
+              "slskd" = {
+                href = "http://${config.networking.hostName}:${toString ports.slskd}";
+                siteMonitor = "http://localhost:${toString ports.slskd}";
+                description = "Soulseek — muzyka niszowa i polska";
+                icon = "soulseek.png";
               };
             }
             {
@@ -933,6 +1064,8 @@ in
     # target exists to prevent.
     systemd.services.podman-cwa = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.podman-threadfin = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.podman-book-downloader = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.slskd = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
 
     # ---- firewall --------------------------------------------------------
     # Only the BitTorrent peer port. Everything else is either loopback-bound
@@ -944,7 +1077,12 @@ in
     # fixed port here rather than a random one is what makes that forwarding
     # rule possible at all.
     networking.firewall = {
-      allowedTCPPorts = [ ports.torrenting ];
+      # Soulseek's listen port joins the BitTorrent one as the only things
+      # open to the world. Both need the router forwarding to be useful;
+      # without it you can still connect outwards, you are just harder for
+      # other peers to reach, which on Soulseek shows up as queues that
+      # never start.
+      allowedTCPPorts = [ ports.torrenting ports.slskdListen ];
       allowedUDPPorts = [ ports.torrenting ]; # DHT and µTP
     };
 

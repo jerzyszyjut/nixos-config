@@ -41,6 +41,8 @@ ingest. Reszta to kuchnia, do której zaglądasz, jak coś nie działa.
 | Sonarr    | http://localhost:8989   | `son`    | **seriale** — to samo, per sezon/odcinek     |
 | Lidarr    | http://localhost:8686   | `lid`    | **muzyka** — to samo, per artysta/album      |
 | Threadfin | http://localhost:34400  | `tf`     | proxy M3U/EPG przed Jellyfin Live TV         |
+| Book Downloader | http://kino:8084  | —        | **szukanie e-booków** → wrzuca do ingestu    |
+| slskd     | http://kino:5030        | —        | **Soulseek** — muzyka niszowa i polska      |
 | Bazarr    | http://localhost:6767   | `baz`    | **napisy** — polskie i angielskie, same się dociągają |
 | Prowlarr  | http://localhost:9696   | `prow`   | trackery                                    |
 | qBittorrent | http://localhost:8080 | `qbt`    | surowe transfery                            |

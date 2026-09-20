@@ -48,6 +48,31 @@
         extraOptions.StrictHostKeyChecking = "accept-new";
       };
 
+      # ---- my own machines -------------------------------------------
+      # Without this, `ssh kino` fails with "Permission denied (publickey)"
+      # and the reason is invisible: ssh only ever offers the DEFAULT
+      # identity names (id_rsa, id_ed25519, …), none of which exist here.
+      # The key is ~/.ssh/default, and ssh will not try it unless told — so
+      # every connection was refused while a perfectly good key sat next to
+      # it on disk.
+      "kino" = {
+        hostname = "kino";
+        user = "jerzy";
+        identityFile = "~/.ssh/default";
+
+        # The port forwards you actually reach for. qBittorrent is the only
+        # service still bound to loopback on the server (it runs with
+        # LocalHostAuth = false, so it has no password), and this is how you
+        # get at it: `ssh kino`, then http://localhost:8080 here.
+        localForwards = [
+          {
+            bind.port = 8080;
+            host.address = "localhost";
+            host.port = 8080;
+          }
+        ];
+      };
+
       # ---- public hosts ----------------------------------------------
       "github.com" = {
         hostname = "github.com";

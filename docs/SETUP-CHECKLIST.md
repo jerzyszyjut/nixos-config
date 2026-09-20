@@ -179,6 +179,56 @@ Całość: ~45 min.
 
 ---
 
+## 10b. Book Downloader — 2 min
+
+1. `http://kino:8084`
+2. Wyszukaj książkę → **Download**
+3. Plik ląduje w `ingest/books`, CWA go przejmuje automatycznie
+4. Podgląd: `journalctl -fu podman-book-downloader`
+
+Książki, które CWA już ma, są wyszarzone — kontener czyta jego bazę
+w trybie tylko-do-odczytu.
+
+---
+
+## 10c. slskd (Soulseek) — muzyka, 8 min
+
+Soulseek to nie tracker, tylko sieć prywatnych kolekcji — stąd jest dobry
+dokładnie tam, gdzie trackery są słabe: polski repertuar, koncerty, rzeczy
+wyczerpane. To jest odpowiedź na Kaczmarskiego.
+
+1. Wymyśl login i hasło do Soulseeka — **konto zakłada się samo** przy
+   pierwszym połączeniu, nie ma rejestracji
+2. Wpisz je na serwerze:
+   ```fish
+   sudo tee /var/lib/slskd/slskd.env <<'EOF'
+   SLSKD_SLSK_USERNAME=twoj_login
+   SLSKD_SLSK_PASSWORD=twoje_haslo
+   SLSKD_USERNAME=jerzy
+   SLSKD_PASSWORD=haslo_do_panelu
+   EOF
+   sudo chown slskd:slskd /var/lib/slskd/slskd.env
+   sudo chmod 600 /var/lib/slskd/slskd.env
+   sudo systemctl restart slskd
+   ```
+   Dwie pierwsze zmienne to konto w sieci Soulseek, dwie kolejne to login
+   do panelu slskd.
+3. `http://kino:5030` → zaloguj się
+4. Sprawdź, że jesteś połączony (status w UI) i że **Shares** pokazuje
+   Twoją bibliotekę muzyczną
+5. Szukaj → pobieraj. Pliki lądują w `/var/lib/media/soulseek/complete`
+6. Do biblioteki: `lid` → **Wanted → Manual Import** → wskaż ten katalog,
+   albo przenieś ręcznie do `library/music` (Navidrome zobaczy przy skanie)
+
+> **Udostępniasz swoją muzykę.** To jedyne miejsce w tej konfiguracji, które
+> celowo wysyła dane na zewnątrz — odwrotnie niż torrenty, gdzie seedowanie
+> jest wyłączone. Na Soulseeku to konieczne: brak udostępniania widzi każdy,
+> od kogo pobierasz, a duża część użytkowników banuje leecherów z automatu.
+> Wystawiony jest **wyłącznie** `library/music`. Żeby wyłączyć: wyczyść
+> `shares.directories` w module — i licz się z kolejkami, które nie ruszają.
+
+---
+
 ## 11. Send-to-Kindle — 10 min
 
 **Google:**
@@ -292,3 +342,5 @@ Dopiero **gdy film poleci z serwera**:
 | `prow` | Prowlarr | 9696 |
 | `qbt` | qBittorrent | 8080 (tylko ssh -L) |
 | `tf` | Threadfin | 34400 |
+
+Nowe, bez skrótów: Book Downloader `8084`, slskd `5030`.
