@@ -46,6 +46,7 @@ REQUIRED=(
   docs/SECRETS.md
   docs/MAINTENANCE.md
   docs/MEDIA.md
+  docs/SETUP-CHECKLIST.md
   docs/SERVER-INSTALL.md
   README.md
 )

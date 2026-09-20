@@ -16,6 +16,7 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 | **[docs/MAINTENANCE.md](docs/MAINTENANCE.md)** | Rebuilding, updating, rollback, "where do I change X", troubleshooting |
 | **[docs/BACKUP.md](docs/BACKUP.md)** | restic + rclone: daily encrypted backup to Google Drive |
 | **[docs/STUDY-SETUP.md](docs/STUDY-SETUP.md)** | Obsidian/Anki/Zotero vault locations, Zotero → Typst citations |
+| **[docs/SETUP-CHECKLIST.md](docs/SETUP-CHECKLIST.md)** | Terse click-through for every service that needs one-time wiring |
 | **[docs/MEDIA.md](docs/MEDIA.md)** | The film stack: what to open, the one-time wiring, and why seeding is off |
 | **[docs/SERVER-INSTALL.md](docs/SERVER-INSTALL.md)** | Building the media server from a bare laptop: USB, BIOS, partitioning, moving the library off the ThinkPad |
 
