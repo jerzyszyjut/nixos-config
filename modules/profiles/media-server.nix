@@ -23,6 +23,29 @@ let
   moviesDir = "${mediaRoot}/library/movies";
   tvDir = "${mediaRoot}/library/tv";
 
+  # Music sits under the SAME root as the torrents for exactly the reason the
+  # comment above gives: Lidarr imports by hardlinking out of qBittorrent's
+  # download directory, and a hardlink cannot cross a btrfs subvolume
+  # boundary. Put the music library on its own subvolume and every album
+  # silently costs twice the disk.
+  musicDir = "${mediaRoot}/library/music";
+
+  # Books do NOT have that constraint — nothing hardlinks them, they arrive
+  # by hand — but they live here anyway because this is the disk with the
+  # space, and because one backup-excluded tree is easier to reason about
+  # than two.
+  booksDir = "${mediaRoot}/library/books";
+
+  # Drop an .epub here and CWA picks it up, fetches metadata, converts it and
+  # files it into booksDir. Deliberately NOT inside library/: CWA deletes
+  # what it has ingested, and a delete-happy watcher pointed anywhere near
+  # the library is how you lose a collection.
+  bookIngestDir = "${mediaRoot}/ingest/books";
+
+  # Jellyfin's DVR writes here. Recordings are large and re-recordable, so
+  # they get the same no-backup treatment as everything else under mediaRoot.
+  dvrDir = "${mediaRoot}/dvr";
+
   # Kept in one place because the services have to be told about each other by
   # hand through their web UIs (see docs/MEDIA.md) and you will be typing
   # these numbers.
@@ -37,6 +60,10 @@ let
     jellyfin = 8096; # LAN-closed, but reachable over Tailscale
     seerr = 5055; # ditto — this is the one you actually use
     homepage = 8082; # ditto — the status page
+    lidarr = 8686; # 127.0.0.1 only — admin, like the other *arrs
+    navidrome = 4533; # LAN-closed, Tailscale-reachable: the phone needs it
+    cwa = 8083; # ditto — you open this from the laptop to send to Kindle
+    threadfin = 34400; # 127.0.0.1 only — Jellyfin talks to it over loopback
   };
 in
 {
@@ -124,6 +151,34 @@ in
       "${mediaRoot}/library".d = { user = "radarr"; group = "media"; mode = "2775"; };
       "${moviesDir}".d = { user = "radarr"; group = "media"; mode = "2775"; };
       "${tvDir}".d = { user = "sonarr"; group = "media"; mode = "2775"; };
+      "${musicDir}".d = { user = "lidarr"; group = "media"; mode = "2775"; };
+
+      # Owned by the CWA container's user, which is created below purely so
+      # these two directories have a non-root owner that the container can
+      # map onto. Both are setgid into `media` like everything else, so
+      # Navidrome-style read access by other services keeps working.
+      "${booksDir}".d = { user = "cwa"; group = "media"; mode = "2775"; };
+      "${mediaRoot}/ingest".d = { user = "cwa"; group = "media"; mode = "2775"; };
+      "${bookIngestDir}".d = { user = "cwa"; group = "media"; mode = "2775"; };
+
+      "${dvrDir}".d = { user = "jellyfin"; group = "media"; mode = "2775"; };
+    };
+
+    # State for the two containers, kept OUT of ${mediaRoot} on purpose: this
+    # is configuration and databases, not re-downloadable media, so it lives
+    # on the system disk where it is small and where a future backup would
+    # actually want to find it.
+    #
+    # Threadfin's ids are numeric because the image hardcodes uid 31337 and
+    # there is no host account to name — systemd-tmpfiles takes numbers here
+    # perfectly well, and inventing a NixOS user just to own two directories
+    # would be ceremony.
+    systemd.tmpfiles.settings."11-media-containers" = {
+      "/var/lib/cwa".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
+      "/var/lib/cwa/config".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
+      "/var/lib/threadfin".d = { user = "31337"; group = "31337"; mode = "0755"; };
+      "/var/lib/threadfin/conf".d = { user = "31337"; group = "31337"; mode = "0755"; };
+      "/var/lib/threadfin/tmp".d = { user = "31337"; group = "31337"; mode = "0755"; };
     };
 
     # btrfs is copy-on-write, and a torrent client writing 4 MiB pieces into
@@ -316,6 +371,75 @@ in
     # Same hardlink-import reason as Radarr above.
     systemd.services.sonarr.serviceConfig.UMask = lib.mkForce "0002";
 
+    # ---- Lidarr ----------------------------------------------------------
+    # Radarr for music. Same shape as the two above and the same wiring: it
+    # asks Prowlarr for releases, hands the torrent to qBittorrent, then
+    # hardlinks and renames the finished files into ${musicDir}.
+    #
+    # Worth knowing before you judge it: music is the weakest of the *arr
+    # family, because it matches against MusicBrainz and an album that is
+    # tagged badly, is a re-release, or is a live set will sit unmatched.
+    # Lidarr is a good way to follow artists you care about and a poor way to
+    # acquire a back catalogue in bulk.
+    services.lidarr = {
+      enable = true;
+      group = "media";
+      settings.server = {
+        port = ports.lidarr;
+        bindaddress = "127.0.0.1";
+      };
+    };
+
+    # Same hardlink-import reason as Radarr and Sonarr.
+    systemd.services.lidarr.serviceConfig.UMask = lib.mkForce "0002";
+
+    # ---- Navidrome -------------------------------------------------------
+    # The music server, and the answer to "how do I listen to this on my
+    # phone". It speaks the SUBSONIC API, which is the reason to pick it:
+    # Subsonic is a decade-old de-facto standard with a dozen good mobile
+    # clients, so you are not tied to a first-party app the way Jellyfin
+    # music or Plexamp would tie you.
+    #
+    # It only ever READS ${musicDir} — Lidarr owns that tree, Navidrome
+    # indexes it. Hence group = "media" and no write anywhere near it.
+    #
+    # Jellyfin can serve music too, and deliberately is not: its music UI and
+    # its mobile story are both markedly worse, and pointing two scanners at
+    # one tree doubles the I/O for no gain.
+    services.navidrome = {
+      enable = true;
+      group = "media";
+
+      # Unlike the *arr admin UIs this is NOT loopback-bound. The phone has
+      # to reach it, and the phone reaches it over Tailscale — so it listens
+      # on all interfaces and the firewall (which trusts tailscale0 and
+      # nothing else) is what keeps the LAN out. Same trade Jellyfin and
+      # Seerr already make.
+      openFirewall = false;
+      settings = {
+        Address = "0.0.0.0";
+        Port = ports.navidrome;
+        MusicFolder = musicDir;
+
+        # Scan on a timer rather than only at startup: Lidarr drops new
+        # albums in whenever a release lands, and a server that only notices
+        # them on restart is a server you restart for no reason.
+        ScanSchedule = "@every 1h";
+
+        # Transcoding for mobile data. Navidrome ships the ffmpeg-backed
+        # profiles but leaves them off by default; turning this on lets a
+        # client ASK for a lower bitrate, which is what you want on a train.
+        # It does not force transcoding on wifi — the client decides.
+        EnableTranscodingConfig = true;
+
+        # Subsonic's legacy auth sends a salted token derived from the
+        # password, so the server needs it recoverable rather than hashed.
+        # That is a property of the protocol, not of Navidrome — treat these
+        # credentials as disposable and do not reuse a real password.
+        EnableInsightsCollector = false;
+      };
+    };
+
     # ---- Bazarr ----------------------------------------------------------
     # Subtitles for what Radarr and Sonarr have already imported. It talks to
     # both over their APIs, notices what they add, and drops .srt files next
@@ -437,6 +561,118 @@ in
       openFirewall = false;
     };
 
+    # =====================================================================
+    # THE TWO CONTAINERS
+    #
+    # Everything else in this file is a native NixOS module, which is the
+    # pattern worth keeping: the package comes from the flake, updates arrive
+    # with `nix flake update`, and the whole thing rolls back with the
+    # generation. These two are the exceptions, for the same reason in both
+    # cases — nobody has packaged them.
+    #
+    #   Calibre-Web-Automated  Not in nixpkgs. Plain calibre-web IS, but it
+    #                          is a different program: no ingest folder, no
+    #                          automatic conversion, no metadata fetch.
+    #   Threadfin              Not in nixpkgs. xTeVe is, but it is the
+    #                          unmaintained project Threadfin forked from,
+    #                          last released in 2020.
+    #
+    # The cost is real and worth stating: these two update by image tag, not
+    # by flake.lock, so `nixos-rebuild` does NOT move them and a rollback
+    # does NOT bring the old one back. Pinning by digest below is what keeps
+    # that from being a surprise — see the comment there.
+    # =====================================================================
+    virtualisation.podman = {
+      enable = true;
+      # Rootless by default for user containers, but these run as system
+      # services. No dockerCompat: nothing here wants a `docker` command, and
+      # aliasing it would collide with profiles.work on a machine that
+      # enabled both.
+      dockerCompat = false;
+      defaultNetwork.settings.dns_enabled = true;
+    };
+    virtualisation.oci-containers.backend = "podman";
+
+    # The account the CWA container's files belong to on the host. It exists
+    # only so that ${booksDir} has a sane owner: LinuxServer images run their
+    # process as PUID:PGID and chown what they touch, and pointing that at
+    # root or at a real user is how a library ends up unreadable by anything
+    # else.
+    users.users.cwa = {
+      isSystemUser = true;
+      group = "cwa";
+      extraGroups = [ "media" ];
+      description = "Calibre-Web-Automated container owner";
+    };
+    users.groups.cwa = { };
+
+    # PUID/PGID have to be NUMBERS, and neither number is known at build
+    # time: NixOS allocates the cwa uid and the media gid at activation. So
+    # they are looked up at start and written to an env file the container
+    # reads, rather than hardcoded — hardcoding them is the bug where the
+    # library works until the day a uid shifts and every file belongs to
+    # nobody.
+    systemd.services.cwa-env = {
+      description = "Resolve uid/gid for the Calibre-Web-Automated container";
+      wantedBy = [ "media.target" ];
+      before = [ "podman-cwa.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = pkgs.writeShellScript "cwa-env" ''
+          set -eu
+          umask 022
+          {
+            echo "PUID=$(${pkgs.coreutils}/bin/id -u cwa)"
+            echo "PGID=$(${pkgs.coreutils}/bin/getent group media | ${pkgs.coreutils}/bin/cut -d: -f3)"
+            echo "TZ=${config.time.timeZone}"
+          } > /run/cwa.env
+        '';
+      };
+    };
+
+    virtualisation.oci-containers.containers.cwa = {
+      # Pinned by DIGEST, not by :latest. A tag is a moving target, and
+      # `podman pull` on a restart would silently swap the running version —
+      # which for a program that rewrites your book metadata in place is not
+      # a risk worth taking for convenience. Update deliberately:
+      #   skopeo inspect docker://docker.io/crocodilestick/calibre-web-automated:latest
+      # then paste the new digest here and rebuild.
+      image = "docker.io/crocodilestick/calibre-web-automated@sha256:c31a738b6d5ec6982c050063dd3f063b6943eb1051fc81144789f840d9093a8d";
+
+      environmentFiles = [ "/run/cwa.env" ];
+
+      volumes = [
+        # Its own database and settings — including, once you set it up in
+        # the UI, the SMTP credentials for Send-to-Kindle.
+        "/var/lib/cwa/config:/config"
+        # Watched. Drop a file here and it is processed and then REMOVED.
+        "${bookIngestDir}:/cwa-book-ingest"
+        # The Calibre library itself: metadata.db plus the book tree.
+        "${booksDir}:/calibre-library"
+      ];
+
+      # Bound to all interfaces on purpose, like Jellyfin and Seerr: you open
+      # this from the laptop over Tailscale to push a book to the Kindle. The
+      # firewall is what keeps the LAN out.
+      ports = [ "${toString ports.cwa}:8083" ];
+    };
+
+    virtualisation.oci-containers.containers.threadfin = {
+      # Same digest-pinning reasoning as above.
+      image = "docker.io/fyb3roptik/threadfin@sha256:863fb0c2945617b4aa48b79eaa655954df72d68fbee6e49a1465934ceb3f057e";
+
+      volumes = [
+        "/var/lib/threadfin/conf:/home/threadfin/conf"
+        "/var/lib/threadfin/tmp:/tmp/threadfin"
+      ];
+
+      # Loopback only. Jellyfin reaches it over localhost, and the admin UI
+      # is a rarely-touched config screen like Prowlarr's — reach it with
+      #   ssh -L 34400:localhost:34400 kino
+      ports = [ "127.0.0.1:${toString ports.threadfin}:34400" ];
+    };
+
     # ---- Homepage --------------------------------------------------------
     # The status page: one place that shows whether all five services are up
     # and how much disk is left, with links to each. It does not DO anything —
@@ -495,6 +731,26 @@ in
           ];
         }
         {
+          "Słuchanie i czytanie" = [
+            {
+              "Navidrome" = {
+                href = "http://localhost:${toString ports.navidrome}";
+                siteMonitor = "http://localhost:${toString ports.navidrome}";
+                description = "Muzyka — serwer Subsonic dla telefonu";
+                icon = "navidrome.png";
+              };
+            }
+            {
+              "Calibre-Web" = {
+                href = "http://localhost:${toString ports.cwa}";
+                siteMonitor = "http://localhost:${toString ports.cwa}";
+                description = "E-booki i wysyłka na Kindle";
+                icon = "calibre-web.png";
+              };
+            }
+          ];
+        }
+        {
           "Kuchnia" = [
             {
               "Radarr" = {
@@ -513,11 +769,27 @@ in
               };
             }
             {
+              "Lidarr" = {
+                href = "http://localhost:${toString ports.lidarr}";
+                siteMonitor = "http://localhost:${toString ports.lidarr}";
+                description = "Muzyka: kolejka i import";
+                icon = "lidarr.png";
+              };
+            }
+            {
               "Bazarr" = {
                 href = "http://localhost:${toString ports.bazarr}";
                 siteMonitor = "http://localhost:${toString ports.bazarr}";
                 description = "Napisy: polskie i angielskie";
                 icon = "bazarr.png";
+              };
+            }
+            {
+              "Threadfin" = {
+                href = "http://localhost:${toString ports.threadfin}";
+                siteMonitor = "http://localhost:${toString ports.threadfin}";
+                description = "Proxy M3U/EPG dla Jellyfin Live TV";
+                icon = "threadfin.png";
               };
             }
             {
@@ -605,6 +877,16 @@ in
     systemd.services.qbittorrent = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.flaresolverr = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.homepage-dashboard = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.lidarr = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.navidrome = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+
+    # The oci-containers module names its units podman-<container>. They join
+    # the target like everything else, so `media-down` still stops the whole
+    # stack in one command — a container left running after media-down would
+    # keep a lock on the library and be exactly the kind of surprise this
+    # target exists to prevent.
+    systemd.services.podman-cwa = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.podman-threadfin = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
 
     # ---- firewall --------------------------------------------------------
     # Only the BitTorrent peer port. Everything else is either loopback-bound

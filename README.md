@@ -36,7 +36,10 @@ Flakes + Home Manager + Stylix, targeting NixOS 26.05 "Yarara".
 | Writing | Typst |
 | Studying | Obsidian, Anki, Zotero (+ Better BibTeX) |
 | C/C++ | gcc/clang, cmake/ninja, ccache, cppcheck, conan globally; Catch2/GTest/gbenchmark via `nix flake init -t #cpp` |
-| Films | Seerr → Radarr → Prowlarr → qBittorrent → Jellyfin, one Homepage dashboard over the lot; seeding off |
+| Films | Seerr → Radarr/Sonarr → Prowlarr → qBittorrent → Jellyfin, one Homepage dashboard over the lot; seeding off |
+| Music | Lidarr → qBittorrent → Navidrome, Subsonic API for phone clients |
+| Books | manual ingest → Calibre-Web-Automated → Send-to-Kindle over SMTP |
+| Live TV | Threadfin merges M3U/EPG sources into one tuner for Jellyfin Live TV |
 | Backup | restic + rclone → Google Drive, daily systemd timer |
 | Theme | Stylix — Gruvbox Material dark medium |
 | Secrets | sops-nix, age keys derived from the SSH host key |
@@ -70,7 +73,7 @@ kino = mkHost {
 
 | | `profiles.work` | `profiles.entertainment` | `profiles.mediaServer` |
 |---|---|---|---|
-| System | nix-ld, Docker, C/C++ and k8s CLIs, LaTeX/Typst | — | Seerr, Radarr, Sonarr, Prowlarr, qBittorrent, FlareSolverr, Jellyfin, Homepage |
+| System | nix-ld, Docker, C/C++ and k8s CLIs, LaTeX/Typst | — | Seerr, Radarr, Sonarr, Lidarr, Bazarr, Prowlarr, qBittorrent, FlareSolverr, Jellyfin, Navidrome, Homepage, plus CWA and Threadfin as containers |
 | Home | editors, language servers, uv/node, Obsidian/Anki/Zotero | jellyfin-media-player, mpv, vlc, Spotify, Discord | `media-up`/`media-down`, the admin abbreviations, subliminal |
 
 **Why `entertainment` and `mediaServer` are separate.** They were one profile

@@ -1,4 +1,4 @@
-# Filmy i seriale: Seerr + Radarr + Sonarr + Bazarr + Prowlarr + qBittorrent + Jellyfin
+# Stack medialny: filmy, seriale, muzyka, e-booki i Live TV
 
 Włączane przez `profiles.mediaServer.enable = true` w `flake.nix`.
 Usługi: `modules/profiles/media-server.nix`, komendy administracyjne:
@@ -16,22 +16,31 @@ Stawianie serwera od zera: [SERVER-INSTALL.md](SERVER-INSTALL.md).
 
 ```
 1337x ─┐         ┌─ Radarr (filmy)  ─┐        ┌─→ Jellyfin ─→ oglądasz
-       ├─ Prowlarr┤                   ├─ qBit ─┤
-inne  ─┘     ↑    └─ Sonarr (seriale) ┘        └─→ biblioteka (hardlink)
-             │
+       ├─ Prowlarr┤─ Sonarr (seriale)├─ qBit ─┤
+inne  ─┘     ↑    └─ Lidarr (muzyka) ┘        ├─→ biblioteka (hardlink)
+             │                                └─→ Navidrome ─→ telefon
            Seerr  ←── tu klikasz „chcę to"
+
+ręcznie ──→ ingest/books ──→ CWA ──→ biblioteka Calibre ──→ Kindle (SMTP)
+
+M3U/EPG ──→ Threadfin ──→ Jellyfin Live TV ──→ oglądasz na żywo
 ```
 
 **Na co dzień otwierasz dwie rzeczy:** `seerr` żeby dodać film i `jf` żeby go
-obejrzeć. Reszta to kuchnia, do której zaglądasz, jak coś nie działa.
+obejrzeć. Muzyki słuchasz z telefonu (Navidrome), książki wrzucasz do folderu
+ingest. Reszta to kuchnia, do której zaglądasz, jak coś nie działa.
 
 | co        | adres                   | skrót    | do czego                                    |
 |-----------|-------------------------|----------|---------------------------------------------|
 | Homepage  | http://localhost:8082   | `media`  | **dashboard** — status wszystkiego + linki  |
 | Seerr     | http://localhost:5055   | `seerr`  | **tu dodajesz film** jednym kliknięciem     |
 | Jellyfin  | http://localhost:8096   | `jf`     | **tu oglądasz**                             |
+| Navidrome | http://localhost:4533   | `nav`    | **muzyka** — serwer Subsonic, gra na telefonie |
+| Calibre-Web | http://localhost:8083 | `cwa`    | **e-booki** — biblioteka i wysyłka na Kindle |
 | Radarr    | http://localhost:7878   | `rad`    | **filmy** — kolejka, import, jakość          |
 | Sonarr    | http://localhost:8989   | `son`    | **seriale** — to samo, per sezon/odcinek     |
+| Lidarr    | http://localhost:8686   | `lid`    | **muzyka** — to samo, per artysta/album      |
+| Threadfin | http://localhost:34400  | `tf`     | proxy M3U/EPG przed Jellyfin Live TV         |
 | Bazarr    | http://localhost:6767   | `baz`    | **napisy** — polskie i angielskie, same się dociągają |
 | Prowlarr  | http://localhost:9696   | `prow`   | trackery                                    |
 | qBittorrent | http://localhost:8080 | `qbt`    | surowe transfery                            |
@@ -409,3 +418,288 @@ Bo **zapisuje** do katalogów biblioteki, a te są `2775 radarr:media`
 i `2775 sonarr:media`. Do tego ma `UMask=0002`, żeby tworzone przez niego
 `.srt` zostały zapisywalne dla grupy — inaczej Radarr i Sonarr nie mogłyby ich
 przemianować razem z filmem przy podmianie wydania na lepsze.
+
+---
+
+# Muzyka: Lidarr + Navidrome
+
+## Podpięcie Lidarra (jednorazowo)
+
+Lidarr jest trzecim `*arr` obok Radarra i Sonarra i podpina się dokładnie tak
+samo — z jedną różnicą: **Prowlarr sam wpisuje do niego indeksery**, więc nie
+dodajesz ich ręcznie.
+
+1. **Klucz API Lidarra** — `lid` → Settings → General → API Key, skopiuj.
+2. **W Prowlarr** (`prow`) → Settings → Apps → `+` → Lidarr:
+   | pole | wartość |
+   |---|---|
+   | Prowlarr Server | `http://localhost:9696` |
+   | Lidarr Server   | `http://localhost:8686` |
+   | API Key         | ten z punktu 1 |
+
+   **Test** → **Save**. Po zapisaniu Prowlarr wypycha wszystkie indeksery do
+   Lidarra; w `lid` → Settings → Indexers powinny się pojawić same.
+3. **Klient pobierania** — `lid` → Settings → Download Clients → `+` →
+   qBittorrent:
+   | pole | wartość |
+   |---|---|
+   | Host | `localhost` |
+   | Port | `8080` |
+   | Category | `lidarr` |
+
+   Kategoria musi być inna niż `radarr`/`sonarr`, inaczej trzy usługi będą
+   sobie nawzajem sprzątać pobrania.
+4. **Root Folder** — Settings → Media Management → Root Folders → Add →
+   `/var/lib/media/library/music`.
+5. **Hardlinki** — Settings → Media Management → zaznacz **Use Hardlinks
+   instead of Copy**. Tak samo jak w Radarze i z tego samego powodu.
+
+### Czego się spodziewać
+
+Lidarr jest najsłabszym z rodziny `*arr` i lepiej wiedzieć to zawczasu niż
+walczyć z nim przez wieczór. Dopasowuje wydania do **MusicBrainz**, więc album
+źle otagowany, reedycja albo koncert potrafi po prostu nie zmatchować się z
+niczym. To dobre narzędzie do śledzenia artystów, których słuchasz, i słabe do
+hurtowego ściągania katalogu wstecz.
+
+## Navidrome i telefon
+
+Navidrome tylko **czyta** `/var/lib/media/library/music` — pisze tam Lidarr.
+Skanuje co godzinę (`ScanSchedule` w module), więc nowy album pojawia się sam;
+ręcznie: UI → Settings → **Scan now**.
+
+### Pierwsze uruchomienie
+
+Wejdź na `nav` **z laptopa przez Tailscale** (`http://kino:4533`) — pierwszy
+utworzony użytkownik zostaje administratorem. Navidrome nie ma domyślnego
+konta, więc kto wejdzie pierwszy, ten jest adminem; zrób to zanim wystawisz
+cokolwiek komukolwiek.
+
+> **Hasła w Subsonic są odwracalne, nie hashowane.** Protokół przesyła token
+> liczony z hasła po stronie klienta, więc serwer musi znać je w postaci
+> odzyskiwalnej. To cecha protokołu, nie Navidrome. Ustaw tu hasło, którego
+> nie używasz nigdzie indziej.
+
+### Aplikacje mobilne
+
+| system | aplikacja | uwagi |
+|---|---|---|
+| Android | **Symfonium** (płatna, ~15 zł) | Najlepszy klient Subsonic jaki jest. Offline, scrobbling, Android Auto, dobra obsługa dużych bibliotek. Jeśli masz zamiar słuchać codziennie — to jest ta. |
+| Android | **Tempo** (darmowa, open source) | Sensowna darmowa alternatywa, jeśli nie chcesz płacić. |
+| iOS | **Amperfy** (darmowa, open source) | Offline, kolejka, działa dobrze z Navidrome. |
+| iOS | **play:Sub** (płatna) | Starsza i dojrzalsza, mocna obsługa trybu offline. |
+
+W każdej z nich konfiguracja jest ta sama:
+
+```
+Server:   http://kino:4533      (nazwa z tailnetu — działa też poza domem)
+Username: <ten z pierwszego logowania>
+Password: <j.w.>
+```
+
+**Nie musisz wystawiać niczego na świat.** Telefon ma być w tym samym
+tailnecie — zainstaluj na nim Tailscale i zaloguj się na to samo konto.
+Firewall na `kino` przepuszcza tylko `tailscale0`, więc `kino:4533` z kawiarni
+działa, a z obcego wifi nikt tam nie zajrzy.
+
+### Transkodowanie pod dane mobilne
+
+Moduł ustawia `EnableTranscodingConfig = true`, co odblokowuje edycję profili
+w UI (domyślnie Navidrome na to nie pozwala). Settings → Transcoding — masz tam
+gotowe profile `opus` i `mp3`.
+
+Transkodowanie **włącza klient, nie serwer**: w Symfonium/Amperfy ustawiasz
+osobno jakość dla wifi i dla danych komórkowych. Sensownie:
+
+| połączenie | ustawienie |
+|---|---|
+| wifi | oryginał (bez transkodowania) |
+| komórka | `opus` 96 kbps — przy mowie i większości muzyki nie usłyszysz różnicy, a zejdzie ~20× |
+
+Transkodowanie kosztuje CPU serwera, ale to ten sam i5-11400H, który
+transkoduje 4K wideo — audio go nie zauważy.
+
+---
+
+# E-booki: Calibre-Web Automated
+
+## Dlaczego kontener
+
+CWA nie jest w nixpkgs. W nixpkgs jest **zwykły** `calibre-web`, ale to inny
+program: bez folderu ingest, bez automatycznej konwersji i bez dociągania
+metadanych — czyli bez wszystkiego, po co CWA istnieje. Stąd jedyny (obok
+Threadfina) kontener w tym stacku.
+
+Obraz jest **przypięty digestem**, nie tagiem `:latest`. Program, który
+przepisuje metadane w Twojej bibliotece w miejscu, nie powinien się podmieniać
+sam przy restarcie. Aktualizacja jest świadoma:
+
+```fish
+skopeo inspect docker://docker.io/crocodilestick/calibre-web-automated:latest | jq -r .Digest
+# wklej nowy digest do modules/profiles/media-server.nix i nrs
+```
+
+To zarazem jedyne dwie rzeczy w tym repo, których `nixos-rebuild` **nie**
+cofnie rollbackiem — generacja wróci, ale obraz kontenera nie.
+
+## Ścieżki
+
+```
+/var/lib/media/ingest/books      ← tu wrzucasz .epub / .pdf / .mobi
+/var/lib/media/library/books     ← biblioteka Calibre (metadata.db + drzewo)
+/var/lib/cwa/config              ← baza i ustawienia CWA, w tym SMTP
+```
+
+**Ingest jest celowo poza `library/`.** CWA **kasuje** to, co przetworzy, a
+watcher kasujący pliki wycelowany gdziekolwiek blisko biblioteki to przepis na
+stratę kolekcji.
+
+## Pierwsze uruchomienie
+
+1. Otwórz `cwa` (`http://kino:8083`). Domyślne konto: **`admin` / `admin123`**
+   — zmień je natychmiast, Admin → Users.
+2. Przy pierwszym starcie CWA zakłada pustą bibliotekę Calibre w
+   `/calibre-library`, jeśli jej nie ma. Nic nie musisz robić ręcznie.
+3. Wrzuć plik do `/var/lib/media/ingest/books` i patrz w logi:
+
+```fish
+journalctl -fu podman-cwa
+```
+
+Plik powinien zniknąć z ingestu i pojawić się w bibliotece — z metadanymi i w
+docelowym formacie.
+
+---
+
+# Wysyłka na Kindle (Send-to-Kindle przez SMTP)
+
+Trzy rzeczy muszą się zgodzić naraz: **SMTP po stronie CWA**, **adres
+`@kindle.com` urządzenia** i **lista zatwierdzonych nadawców u Amazona**.
+Pominięcie trzeciego jest najczęstszą przyczyną „wysłało się i nie doszło" —
+Amazon wyrzuca takie maile po cichu, bez odbicia.
+
+## 1. Hasło aplikacji Google
+
+Zwykłe hasło do konta **nie zadziała** — Google zablokował logowanie hasłem do
+SMTP. Potrzebujesz hasła aplikacji, a te wymagają włączonego 2FA:
+
+1. <https://myaccount.google.com/security> → **Weryfikacja dwuetapowa** —
+   włącz, jeśli nie masz.
+2. <https://myaccount.google.com/apppasswords> → nazwij je np. `kino-cwa` →
+   skopiuj 16 znaków.
+
+To hasło daje dostęp do wysyłki poczty z Twojego konta. Trafia do bazy CWA w
+`/var/lib/cwa/config`, na dysku systemowym, nie do repozytorium.
+
+## 2. SMTP w CWA
+
+`cwa` → **Admin → Edit E-mail Server Settings**:
+
+| pole | wartość |
+|---|---|
+| SMTP Hostname | `smtp.gmail.com` |
+| SMTP Port | `587` |
+| Encryption | **STARTTLS** |
+| SMTP Login | Twój pełny adres `@gmail.com` |
+| SMTP Password | hasło aplikacji z punktu 1 |
+| From E-mail | ten sam adres `@gmail.com` |
+
+**Save**, potem **Send Test E-Mail** — najpierw na własny adres, żeby oddzielić
+problem z SMTP od problemu z Amazonem.
+
+## 3. Strona Amazona
+
+Wejdź na **<https://www.amazon.com/mycd>** (Konto → Treści i urządzenia) →
+zakładka **Preferences** → **Personal Document Settings**. Dwie rzeczy:
+
+- **Send-to-Kindle E-Mail Settings** — tu jest adres Twojego czytnika, w
+  formacie `cośtam@kindle.com`. Każde urządzenie ma własny; jeśli masz kilka,
+  każdy jest inny. Ten adres wpisujesz w CWA przy swoim użytkowniku
+  (Admin → Users → Twój użytkownik → **Kindle E-Mail**).
+- **Approved Personal Document E-mail List** → **Add a new approved e-mail
+  address** → wpisz **ten sam adres `@gmail.com`**, z którego CWA wysyła.
+
+Bez tej drugiej pozycji nic nie dojdzie i **nie dostaniesz żadnego błędu** —
+ani u Amazona, ani w logach CWA. Mail po prostu znika.
+
+## 4. Format
+
+Tu jest pułapka, na którą łatwo trafić w starszych poradnikach: **MOBI już nie
+działa**. Amazon wycofał jego obsługę w Send-to-Kindle w sierpniu 2022.
+
+Dziś Send-to-Kindle przyjmuje m.in. **EPUB**, PDF, DOCX, TXT, HTML — i EPUB-a
+konwertuje po swojej stronie do formatu czytnika (KF8/AZW3). Czyli:
+
+> **Ustaw EPUB jako domyślny format wysyłki.** Nie AZW3, nie MOBI.
+
+W CWA: Admin → **Basic Configuration → External Binaries** upewnij się, że
+ścieżka do `ebook-convert` jest wykryta (w tym obrazie jest), a przy wysyłce
+wybierz EPUB. Jeśli książka jest w innym formacie, CWA konwertuje ją przed
+wysłaniem — po to jest Calibre w obrazie.
+
+Limit załącznika po stronie Amazona to ~50 MB. Grube PDF-y ze skanami potrafią
+go przekroczyć.
+
+## 5. Automat czy przycisk
+
+| podejście | plus | minus |
+|---|---|---|
+| **Ręcznie** (przycisk „Send to Kindle" przy książce) — *domyślne, polecam na start* | Wysyłasz to, co faktycznie chcesz czytać. Kindle nie zapycha się wszystkim, co przeszło przez ingest. | Trzeba kliknąć. |
+| **Auto po ingest** (CWA: Settings → Auto-Send) | Nic nie klikasz, książka ląduje na czytniku sama. | Każdy śmieć z ingestu ląduje na Kindlu, a kasowanie z czytnika jest upierdliwe. Przy złym formacie dostajesz serię cichych porażek zamiast jednej widocznej. |
+
+Zacznij od ręcznego. Auto ma sens dopiero wtedy, gdy ingest jest czysty i
+wiesz, że konwersja działa powtarzalnie.
+
+---
+
+# Live TV w Jellyfin (Threadfin jako proxy)
+
+Infrastruktura stoi i czeka na URL — **źródła M3U/EPG nie ma w tym repo i nie
+będzie**, to Twoja decyzja i Twoje źródło.
+
+## Po co Threadfin pomiędzy
+
+Jellyfin potrafi przyjąć M3U bezpośrednio i przy jednym źródle Threadfin jest
+zbędny. Zarabia na siebie, gdy:
+
+- masz **więcej niż jedno** źródło i chcesz je widzieć jako jeden tuner,
+- playlista ma **setki kanałów**, a chcesz dwadzieścia — filtrowanie po stronie
+  Threadfina oznacza, że Jellyfin nigdy nie zobaczy reszty,
+- chcesz **mapować kanały na EPG** ręcznie, bo `tvg-id` w playliście nie zgadza
+  się z XMLTV (to jest reguła, nie wyjątek),
+- źródło limituje liczbę połączeń — Threadfin buforuje jeden strumień i podaje
+  go dalej.
+
+## Kolejność wpinania
+
+1. **Threadfin** (`tf`, `http://localhost:34400` — przez `ssh -L 34400:localhost:34400 kino`):
+   kreator pierwszego uruchomienia → dodaj **Playlist (M3U)** i **XMLTV**.
+2. **Mapowanie** — zakładka *Mapping*: przypisz kanałom właściwe `tvg-id`
+   z EPG i wyłącz te, których nie chcesz. To jest ta praca, dla której
+   Threadfin istnieje.
+3. Threadfin wystawia własne, już posprzątane endpointy:
+
+```
+M3U:   http://localhost:34400/m3u/threadfin.m3u
+XMLTV: http://localhost:34400/xmltv/threadfin.xml
+```
+
+4. **Jellyfin** (`jf`) → Dashboard → **Live TV**:
+   - *Tuner Devices* → `+` → **M3U Tuner** → wklej adres M3U z punktu 3.
+   - *TV Guide Data Providers* → `+` → **XMLTV** → wklej adres XMLTV.
+   - *Refresh Guide*.
+
+## DVR
+
+Katalog na nagrania jest już utworzony i ma właściciela `jellyfin:media`:
+
+```
+/var/lib/media/dvr
+```
+
+Wpisz go w Jellyfin → Dashboard → Live TV → **Recording Path**. Leży pod
+`mediaRoot`, czyli na dysku 931 GB i poza backupem — tak jak reszta rzeczy
+odtwarzalnych.
+
+Transkodowanie nagrań i podglądu idzie przez QuickSync tak samo jak filmy —
+sprawdzone na tej maszynie: `vainfo` pokazuje HEVC Main10 dekod i enkod.

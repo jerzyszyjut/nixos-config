@@ -13,11 +13,19 @@ let
     "seerr"
     "radarr"
     "sonarr"
+    "lidarr"
     "bazarr"
     "prowlarr"
     "qbittorrent"
     "flaresolverr"
+    "navidrome"
     "homepage-dashboard"
+    # The two containers. oci-containers names its units podman-<name>, and
+    # they are in media.target like everything else — so if one of these is
+    # dead while the rest are fine, the cause is usually the image pull, not
+    # the service.
+    "podman-cwa"
+    "podman-threadfin"
   ];
 in
 lib.mkIf osConfig.profiles.mediaServer.enable {
@@ -48,6 +56,10 @@ lib.mkIf osConfig.profiles.mediaServer.enable {
     jf = lib.mkDefault "xdg-open http://localhost:8096"; # Jellyfin — the one you watch in
     rad = "xdg-open http://localhost:7878"; # Radarr — admin, rarely needed
     son = "xdg-open http://localhost:8989"; # Sonarr — same, for series
+    lid = "xdg-open http://localhost:8686"; # Lidarr — same, for music
+    nav = "xdg-open http://localhost:4533"; # Navidrome — the music server
+    cwa = "xdg-open http://localhost:8083"; # Calibre-Web — books, Kindle
+    tf = "xdg-open http://localhost:34400"; # Threadfin — M3U/EPG proxy
     prow = "xdg-open http://localhost:9696"; # Prowlarr — trackers
     baz = "xdg-open http://localhost:6767"; # Bazarr — subtitles
     qbt = "xdg-open http://localhost:8080"; # qBittorrent — raw transfers
@@ -63,8 +75,9 @@ lib.mkIf osConfig.profiles.mediaServer.enable {
 
   # ---- the four handles ----------------------------------------------------
   # Start/stop go through media.target, which every unit is PartOf, so one
-  # command moves all nine. Downloads in flight are not lost: qBittorrent
-  # writes its resume data on shutdown and picks them back up on start.
+  # command moves all of them, containers included. Downloads in flight are
+  # not lost: qBittorrent writes its resume data on shutdown and picks them
+  # back up on start.
   programs.fish.functions.media-up = ''
     sudo systemctl start media.target; and echo "media: up"
   '';
