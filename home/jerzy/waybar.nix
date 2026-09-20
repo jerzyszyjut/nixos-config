@@ -1,4 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, osConfig, ... }:
+
+# A status bar is meaningless without a compositor to put it on, so the whole
+# module is gated on profiles.desktop — the headless media server neither
+# builds nor configures it.
 
 let
   # Stylix exposes the active scheme here, so the bar follows automatically if
@@ -12,7 +16,7 @@ let
   #         base0E = "#d3869b"; };
   c = config.lib.stylix.colors.withHashtag;
 in
-{
+lib.mkIf osConfig.profiles.desktop.enable {
   # NOTE: this replaces the dotfiles/waybar symlink. Waybar config is
   # machine-specific and never needed on the TASK nodes, so managing it in Nix
   # buys us the Stylix colors for free — worth the tradeoff here.

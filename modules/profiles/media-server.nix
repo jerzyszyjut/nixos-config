@@ -406,6 +406,14 @@ in
     # transcoding still works, it just silently stops tone mapping and HDR
     # films come out washed out and grey. extraPackages is a list, so this
     # appends to what desktop.nix already declares.
+    #
+    # `enable` matters on a HEADLESS server and is easy to miss: it used to
+    # come from modules/nixos/desktop.nix, which every machine got. Now that
+    # the desktop is opt-in, a server without it would have no
+    # /run/opengl-driver at all — vainfo would find no driver and Jellyfin
+    # would fall back to software transcoding with nothing in the log saying
+    # why. Video acceleration is not a desktop feature.
+    hardware.graphics.enable = true;
     hardware.graphics.extraPackages = [ pkgs.intel-compute-runtime ];
 
     # ---- Seerr (was Jellyseerr) ------------------------------------------

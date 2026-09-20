@@ -82,6 +82,8 @@
       # `profiles`, which is how this repo serves both halves of your life
       # without a second copy of it:
       #
+      #   profiles.desktop        Hyprland, greetd, PipeWire, fonts,
+      #                           Firefox, printing — anything with a screen
       #   profiles.work           nix-ld, Docker, C++/Python/k8s, LaTeX,
       #                           the editors and language servers
       #   profiles.entertainment  the players (jellyfin-media-player, mpv,
@@ -117,11 +119,16 @@
             # ---- always on ----
             ./modules/nixos/base.nix
             ./modules/nixos/style.nix
-            ./modules/nixos/desktop.nix
             ./modules/nixos/net.nix
             ./modules/nixos/secrets.nix
 
             # ---- opt-in ----
+            # desktop.nix is here rather than above because `kino` is
+            # headless: a laptop with the lid shut that nobody logs into
+            # locally has no use for a compositor, and building one for it
+            # cost several GB and produced a Hyprland that segfaulted on
+            # every greetd login.
+            ./modules/nixos/desktop.nix
             ./modules/profiles/work.nix
             ./modules/profiles/entertainment.nix
             ./modules/profiles/media-server.nix
@@ -149,6 +156,7 @@
           # ThinkPad E14 Gen 6 (Intel), machine type 21M7 — exact match exists.
           hardwareModules = [ nixos-hardware.nixosModules.lenovo-thinkpad-e14-intel-gen6 ];
           profiles = {
+            desktop.enable = true;
             work.enable = true;
 
             # The players, Spotify and Discord. The services this talks to
@@ -199,6 +207,10 @@
           ];
 
           profiles = {
+            # No desktop.enable: headless on purpose. A TTY and SSH over
+            # Tailscale are the two ways in, and that is enough — the first
+            # `tailscale up` has to be typed at the machine, which a TTY
+            # handles fine.
             mediaServer.enable = true;
             # Whether the stack comes up with the machine. Not a runtime
             # switch: /etc/systemd/system is a read-only store symlink, so

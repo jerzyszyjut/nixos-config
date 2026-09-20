@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, osConfig, ... }:
 
 {
   # ---- terminal: kitty ---------------------------------------------------
@@ -15,7 +15,12 @@
   #    including over SSH. You can look at matplotlib output on a compute node
   #    without copying files back or forwarding X11.
   programs.kitty = {
-    enable = true;
+    # A terminal emulator needs something to draw into. On the headless
+    # server the shell lives on a TTY or at the end of an ssh connection,
+    # and kitty would only pull GUI libraries in for nothing — its config
+    # below is left intact so enabling the desktop profile brings it back
+    # exactly as it was.
+    enable = osConfig.profiles.desktop.enable;
     shellIntegration.enableFishIntegration = true;
     settings = {
       scrollback_lines = 10000;
@@ -78,7 +83,8 @@
   # ---- PDF: zathura ------------------------------------------------------
   # Okular stays installed (packages.nix) for annotating.
   programs.zathura = {
-    enable = true;
+    # Same reasoning as kitty: a PDF viewer needs a screen.
+    enable = osConfig.profiles.desktop.enable;
     options = {
       selection-clipboard = "clipboard";
       adjust-open = "best-fit";

@@ -1,6 +1,31 @@
 { config, lib, pkgs, ... }:
 
+let
+  cfg = config.profiles.desktop;
+in
 {
+  # =========================================================================
+  # THE DESKTOP: compositor, greeter, audio, fonts, browser, printing.
+  #
+  # Opt-in rather than always-on, which it used to be. The media server is a
+  # laptop with the lid shut that nobody logs into locally — it has no use for
+  # Hyprland, and building one for it cost several GB of closure and a
+  # Hyprland that segfaulted in aquamarine on every greetd login anyway.
+  #
+  # Anything a HEADLESS machine still needs must NOT live in here. The one
+  # that caught us: `hardware.graphics.enable`, which Jellyfin needs for
+  # QuickSync transcoding and which has nothing to do with having a screen.
+  # It now lives in modules/profiles/media-server.nix as well, so the server
+  # keeps its video acceleration without a desktop attached.
+  # =========================================================================
+  options.profiles.desktop.enable = lib.mkEnableOption ''
+    the graphical desktop: Hyprland, greetd, PipeWire, Bluetooth, fonts,
+    Firefox and printing.
+
+    Leave off for a headless machine — it keeps a TTY and SSH
+  '';
+
+  config = lib.mkIf cfg.enable {
   # ---- compositor --------------------------------------------------------
   programs.hyprland = {
     enable = true;
@@ -194,5 +219,6 @@
   services.avahi = {
     enable = true;
     nssmdns4 = true; # network printer discovery
+  };
   };
 }

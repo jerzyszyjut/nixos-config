@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, osConfig, ... }:
 
 let
   # Where this repo lives on disk. mkOutOfStoreSymlink points at the real
@@ -56,7 +56,12 @@ in
     # is exactly what happened. Stylix's generated hyprpaper.conf lives at
     # ~/.config/hypr-stylix/ instead (see modules/nixos/style.nix) — a
     # directory that never overlaps with this one.
-    "hypr".source = config.lib.file.mkOutOfStoreSymlink "${repo}/dotfiles/hypr";
+    # Gated with the desktop profile: a headless machine has no compositor
+    # to read this, and linking it would leave a dangling reference on a host
+    # where dotfiles/hypr is never used.
+    "hypr" = lib.mkIf osConfig.profiles.desktop.enable {
+      source = config.lib.file.mkOutOfStoreSymlink "${repo}/dotfiles/hypr";
+    };
     # waybar is NOT symlinked — it's managed in waybar.nix so its stylesheet
     # can interpolate the Stylix colors. It's never needed on a remote server,
     # so the portability argument doesn't apply.
