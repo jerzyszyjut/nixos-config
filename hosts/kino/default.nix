@@ -206,7 +206,12 @@
   systemd.services.net-watchdog = {
     description = "Bounce the network connection if the gateway goes unreachable";
     serviceConfig.Type = "oneshot";
-    path = [ pkgs.iputils pkgs.networkmanager pkgs.iproute2 ];
+    # gawk and coreutils are NOT implied. A systemd unit gets the PATH it
+    # is given and nothing else, so the first version of this script died
+    # on "awk: command not found" — which, for a watchdog, means it would
+    # have sat there failing silently every two minutes while the thing it
+    # was supposed to be guarding went unguarded.
+    path = [ pkgs.iputils pkgs.networkmanager pkgs.iproute2 pkgs.gawk pkgs.coreutils ];
     script = ''
       gw=$(ip route show default | awk '/default/ {print $3; exit}')
       if [ -z "$gw" ]; then
