@@ -152,6 +152,37 @@
   # the SATA/NVMe link. On a server that shows up as latency on the first
   # request after an idle period.
 
+  # ---- surviving a power cut ---------------------------------------------
+  # This machine's BIOS has no "resume on AC power" setting — Lenovo ships
+  # that on ThinkPads and desktops, not on Legions, and /sys/class/
+  # firmware-attributes is empty so there is nothing to set from software
+  # either. After mains is lost long enough, someone has to walk over and
+  # press the button. That is simply the deal with this hardware.
+  #
+  # What the battery DOES give is ride-through: 54 Wh of real capacity
+  # against maybe 12 W at idle, so a brief cut never reaches the OS at all.
+  #
+  # The gap this closes is the LONG cut. upower came from desktop.nix and
+  # went away with it, so nothing was watching the battery: the machine
+  # would have run until the charge hit zero and then stopped mid-write,
+  # which is how a btrfs filesystem earns a scrub it might not pass.
+  #
+  # usePercentageForPolicy because the firmware's own time-remaining
+  # estimate on this model is unreliable under a constant server load —
+  # percentages are dumber and steadier.
+  services.upower = {
+    enable = true;
+    usePercentageForPolicy = true;
+    percentageLow = 20;
+    percentageCritical = 10;
+
+    # Shut down, do not hibernate: there is no swap on this machine (zram
+    # only), so hibernation has nowhere to write and would fail at the one
+    # moment it matters.
+    percentageAction = 5;
+    criticalPowerAction = "PowerOff";
+  };
+
   # ---- the battery -------------------------------------------------------
   # A lithium cell held at 100% and kept warm swells, and on a laptop that is
   # mains-powered forever the battery is doing nothing else — so cap it.
