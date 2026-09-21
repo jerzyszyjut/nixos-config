@@ -182,6 +182,60 @@
     };
   };
 
+  # ---- staying on the network --------------------------------------------
+  # A headless server that loses wifi loses everything, and that is not
+  # hypothetical here: on 2026-09-21 iwd tried to roam between two APs of
+  # the same mesh, the authentication timed out, NetworkManager failed to
+  # activate the connection twice, gave up, deauthenticated "by local
+  # choice" and left the machine off the network for two hours until
+  # someone walked over to it.
+  #
+  # The radio recovered on its own within a second. NetworkManager is what
+  # stopped trying — it retries a connection a fixed number of times and
+  # then waits for something to prod it, which on a machine with nobody
+  # logged in never comes.
+  #
+  # So this is a watchdog, and it is deliberately dumb: if the default
+  # gateway has not answered a ping for two consecutive checks, bounce the
+  # connection. Dumb is the point — it cannot itself fail in an interesting
+  # way, and the failure it recovers from is "the link is down and nothing
+  # is going to notice".
+  #
+  # The real fix is the ethernet port, which this machine has and is not
+  # using. This makes wifi survivable, not good.
+  systemd.services.net-watchdog = {
+    description = "Bounce the network connection if the gateway goes unreachable";
+    serviceConfig.Type = "oneshot";
+    path = [ pkgs.iputils pkgs.networkmanager pkgs.iproute2 ];
+    script = ''
+      gw=$(ip route show default | awk '/default/ {print $3; exit}')
+      if [ -z "$gw" ]; then
+        echo "no default route at all; bouncing"
+      elif ping -c 2 -W 3 "$gw" >/dev/null 2>&1; then
+        exit 0
+      else
+        echo "gateway $gw unreachable; bouncing"
+      fi
+
+      # `nmcli connection up` rather than restarting NetworkManager: it is
+      # narrower, and restarting NM tears down the tailscale0 route with it.
+      con=$(nmcli -t -f NAME,TYPE connection show | awk -F: '$2=="802-11-wireless"{print $1; exit}')
+      [ -n "$con" ] && nmcli connection up "$con" || nmcli device connect wlan0 || true
+    '';
+  };
+
+  systemd.timers.net-watchdog = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      # First check two minutes after boot, then every two minutes. Long
+      # enough that an ordinary roam completes without the watchdog firing,
+      # short enough that an outage is minutes rather than hours.
+      OnBootSec = "2min";
+      OnUnitActiveSec = "2min";
+      AccuracySec = "10s";
+    };
+  };
+
   # ---- getting back into it ----------------------------------------------
   # This box has no keyboard you will use. SSH is how you administer it, and
   # if this is wrong you are carrying a monitor to it.
