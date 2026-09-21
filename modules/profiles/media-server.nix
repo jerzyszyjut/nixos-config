@@ -411,6 +411,21 @@ in
           MaxActiveDownloads = 3;
           MaxActiveTorrents = 8;
           MaxConnections = 200;
+        } // lib.optionalAttrs cfg.vpn.enable {
+          # Bind every peer connection to the tunnel interface.
+          #
+          # This single setting does two jobs. It is the ROUTING: packets
+          # leave carrying the tunnel's source address, which is the only
+          # thing the `ip rule` matches, so they take the tunnel's default
+          # route. And it is the KILL SWITCH: qBittorrent bound to a named
+          # interface does not fall back to another one, so if the tunnel
+          # drops there is no address to bind and it simply stops.
+          #
+          # Both spellings on purpose — qBittorrent has used one and then
+          # the other across versions. Setting the one it ignores costs
+          # nothing; setting neither costs everything.
+          "Session\\Interface" = "wg-mullvad";
+          "Session\\InterfaceName" = "wg-mullvad";
         };
       };
     };
@@ -1203,21 +1218,6 @@ in
             cpu = true;
             memory = true;
             disk = "/";
-          } // lib.optionalAttrs cfg.vpn.enable {
-            # Bind every peer connection to the tunnel interface.
-            #
-            # This single setting does two jobs. It is the ROUTING: packets
-            # leave with the tunnel's source address, which is the only
-            # thing the `ip rule` above matches, so they take the tunnel's
-            # default route. And it is the KILL SWITCH: qBittorrent bound to
-            # a named interface does not fall back to another one, so if the
-            # tunnel drops there is no address to bind and it simply stops.
-            #
-            # Both keys on purpose — qBittorrent has used one spelling and
-            # then the other across versions, and setting the one it ignores
-            # costs nothing while setting neither costs everything.
-            Interface = "wg-mullvad";
-            InterfaceName = "wg-mullvad";
           };
         }
       ];
