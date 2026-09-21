@@ -207,6 +207,27 @@
           ];
 
           profiles = {
+            # ---- qBittorrent through Mullvad --------------------------
+            # Only qBittorrent uses this; see the long comment in
+            # modules/profiles/media-server.nix for why that is structural
+            # rather than a compromise. The private key is NOT here — it
+            # lives at /var/lib/mullvad/private.key, mode 600, because
+            # anything in a Nix option lands in the world-readable store.
+            #
+            # These three come from the WireGuard config Mullvad generates
+            # (ch-zrh-wg-001, Zurich). None of them is secret: an address,
+            # a server's public key, and a public endpoint.
+            #
+            # Only the IPv4 address is used. The config also assigns an
+            # IPv6 one, and leaving it out means qBittorrent has no v6 path
+            # through the tunnel — which is the safe direction to fail,
+            # since a v6 route that bypassed the tunnel is exactly the leak
+            # this whole arrangement exists to prevent.
+            mediaServer.vpn.enable = true;
+            mediaServer.vpn.address = "10.71.89.111/32";
+            mediaServer.vpn.peer.publicKey = "chvEpRH+05o+ESv8QLzNyY3Phirsym0mUvF03Kt7oCo=";
+            mediaServer.vpn.peer.endpoint = "193.32.127.71:51820";
+
             # No desktop.enable: headless on purpose. A TTY and SSH over
             # Tailscale are the two ways in, and that is enough — the first
             # `tailscale up` has to be typed at the machine, which a TTY
