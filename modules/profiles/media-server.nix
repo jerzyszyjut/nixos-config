@@ -110,6 +110,52 @@ in
       `profiles.entertainment` on each machine you watch from
     '';
 
+    vpn = {
+      enable = lib.mkEnableOption ''
+        routing qBittorrent's traffic through a Mullvad WireGuard tunnel.
+
+        Off until you have filled in the three values below — turning it on
+        without them fails the build rather than starting a tunnel to
+        nowhere
+      '';
+
+      address = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        example = "10.66.123.45/32";
+        description = ''
+          The address Mullvad assigned to your key, exactly as it appears in
+          the Address line of the generated WireGuard config.
+        '';
+      };
+
+      privateKeyFile = lib.mkOption {
+        type = lib.types.str;
+        default = "/var/lib/mullvad/private.key";
+        description = ''
+          Path to a file containing ONLY the PrivateKey line's value.
+
+          A path, not the key itself: anything written into a Nix option
+          ends up in the world-readable store. This file you create by hand,
+          chmod 600, and it never enters the repository.
+        '';
+      };
+
+      peer = {
+        publicKey = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "The server's PublicKey from the Mullvad config.";
+        };
+        endpoint = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          example = "185.65.135.72:51820";
+          description = "The server's Endpoint from the Mullvad config.";
+        };
+      };
+    };
+
     autostart = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -373,6 +419,80 @@ in
     # group-writable and Radarr is allowed to hardlink it. See the note on
     # protected_hardlinks above.
     systemd.services.qbittorrent.serviceConfig.UMask = "0002";
+
+    # =====================================================================
+    # THE VPN, AND WHY IT TOUCHES NOTHING ELSE
+    #
+    # Only qBittorrent's traffic goes through it. That is not a compromise
+    # for simplicity, it is the point: Jellyfin needs to answer the TV on
+    # the LAN, sshd needs to answer over tailscale0, and Navidrome needs to
+    # answer a phone. Pushing all of that through an exit node in another
+    # country would be slower, would break the LAN path outright, and would
+    # protect nothing that needs protecting.
+    #
+    # `table = "off"` is what makes that guarantee structural rather than
+    # careful: the interface adds NO routes to any table the rest of the
+    # system uses. Everything keeps working because nothing was changed,
+    # not because the exceptions were written correctly.
+    #
+    # Traffic reaches the tunnel by a source-address rule instead:
+    # qBittorrent is bound to this interface (Session\Interface* below), so
+    # its packets carry the tunnel's address, and only those packets match
+    # the rule and get the tunnel's default route.
+    #
+    # THE KILL SWITCH is a consequence of the same binding rather than a
+    # separate mechanism. If the tunnel drops, the address goes with it,
+    # qBittorrent's sockets cannot bind, and it stops — it has nothing to
+    # fall back TO. No rule can be forgotten, because there is no rule.
+    #
+    # What this does NOT hide: DNS. Tracker hostnames are resolved by the
+    # system resolver over the ordinary route, so your ISP still sees which
+    # trackers you look up, just not what you exchange with them. Closing
+    # that means a resolver inside the tunnel, which is a separate job.
+    # =====================================================================
+    networking.wireguard.interfaces.wg-mullvad = lib.mkIf cfg.vpn.enable {
+      ips = [ cfg.vpn.address ];
+      privateKeyFile = cfg.vpn.privateKeyFile;
+
+      # No routes in the main table, and none derived from allowedIPs
+      # either. Both are needed: allowedIPs is 0.0.0.0/0, and without this
+      # the module would helpfully install a default route over the tunnel
+      # and take the whole machine with it.
+      table = "off";
+      allowedIPsAsRoutes = false;
+
+      peers = [{
+        publicKey = cfg.vpn.peer.publicKey;
+        endpoint = cfg.vpn.peer.endpoint;
+        allowedIPs = [ "0.0.0.0/0" "::/0" ];
+        # Mullvad drops idle sessions behind NAT; 25s is their documented
+        # value and the difference between a tunnel that survives a quiet
+        # night and one that silently stops passing traffic.
+        persistentKeepalive = 25;
+      }];
+
+      postSetup = ''
+        ${pkgs.iproute2}/bin/ip route add default dev wg-mullvad table 51820
+        ${pkgs.iproute2}/bin/ip rule add from ${lib.head (lib.splitString "/" cfg.vpn.address)} lookup 51820 priority 100
+      '';
+
+      postShutdown = ''
+        ${pkgs.iproute2}/bin/ip rule del from ${lib.head (lib.splitString "/" cfg.vpn.address)} lookup 51820 priority 100 || true
+        ${pkgs.iproute2}/bin/ip route del default dev wg-mullvad table 51820 || true
+      '';
+    };
+
+    assertions = lib.optionals cfg.vpn.enable [
+      {
+        assertion = cfg.vpn.address != "" && cfg.vpn.peer.publicKey != "" && cfg.vpn.peer.endpoint != "";
+        message = ''
+          profiles.mediaServer.vpn.enable is on but address / peer.publicKey /
+          peer.endpoint are empty. Fill them in from the WireGuard config
+          Mullvad generates, or the tunnel comes up pointing nowhere and
+          qBittorrent silently stops working.
+        '';
+      }
+    ];
 
     # ---- Prowlarr --------------------------------------------------------
     # Indexer manager. 1337x, and every other tracker you add here, is defined
@@ -1083,6 +1203,21 @@ in
             cpu = true;
             memory = true;
             disk = "/";
+          } // lib.optionalAttrs cfg.vpn.enable {
+            # Bind every peer connection to the tunnel interface.
+            #
+            # This single setting does two jobs. It is the ROUTING: packets
+            # leave with the tunnel's source address, which is the only
+            # thing the `ip rule` above matches, so they take the tunnel's
+            # default route. And it is the KILL SWITCH: qBittorrent bound to
+            # a named interface does not fall back to another one, so if the
+            # tunnel drops there is no address to bind and it simply stops.
+            #
+            # Both keys on purpose — qBittorrent has used one spelling and
+            # then the other across versions, and setting the one it ignores
+            # costs nothing while setting neither costs everything.
+            Interface = "wg-mullvad";
+            InterfaceName = "wg-mullvad";
           };
         }
       ];
