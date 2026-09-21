@@ -424,8 +424,12 @@ in
           # Both spellings on purpose — qBittorrent has used one and then
           # the other across versions. Setting the one it ignores costs
           # nothing; setting neither costs everything.
-          "Session\\Interface" = "wg-mullvad";
-          "Session\\InterfaceName" = "wg-mullvad";
+          # NOT "Session\\Interface": the module derives the key prefix from
+          # the attribute path, so BitTorrent.Session.Interface already
+          # writes Session\\Interface. Spelling the prefix here too produced
+          # Session\\Session\\Interface, which qBittorrent silently ignored.
+          Interface = "wg-mullvad";
+          InterfaceName = "wg-mullvad";
         };
       };
     };
