@@ -1056,7 +1056,18 @@ in
         WEBUI_PORT = toString ports.soularr;
         TZ = config.time.timeZone;
       };
-      extraOptions = [ "--network=host" ];
+      extraOptions = [
+        "--network=host"
+        # Soularr runs as root inside the container and renames each finished
+        # download folder. Under podman's default umask 022 that folder comes
+        # out 0755 — no group write — and Lidarr, which imports by MOVING the
+        # files out, needs write on the folder to unlink them. The result was
+        # "Permission denied" on every track, the album moved to
+        # failed_imports and denylisted. 0002 gives the folder group write,
+        # and the setgid bit inherited from ${soulseekDir}/complete makes
+        # that group `media`, which is where Lidarr lives.
+        "--umask=0002"
+      ];
     };
 
     virtualisation.oci-containers.containers.threadfin = {
