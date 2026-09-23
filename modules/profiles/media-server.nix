@@ -72,6 +72,7 @@ let
     bookDownloader = 8084; # LAN-closed, Tailscale-reachable — you search here
     slskd = 5030; # ditto — the Soulseek web UI
     slskdListen = 50300; # the only OTHER port opened to the outside world
+    soularr = 8265; # its status page, Tailscale-reachable
   };
 in
 {
@@ -251,6 +252,7 @@ in
       "/var/lib/shelfmark".d = { user = "cwa"; group = "media"; mode = "0750"; };
       "/var/lib/shelfmark/config".d = { user = "cwa"; group = "media"; mode = "0750"; };
 
+      "/var/lib/soularr".d = { user = "root"; group = "root"; mode = "0700"; };
       "/var/lib/slskd".d = { user = "slskd"; group = "media"; mode = "0750"; };
       "/var/lib/slskd/slskd.env".f = { user = "slskd"; group = "media"; mode = "0600"; };
 
@@ -638,6 +640,16 @@ in
 
         soulseek.listen_port = ports.slskdListen;
 
+        # For Soularr. This key has to live in settings, which means the Nix
+        # store and this repository, so it is fenced to loopback: slskd
+        # refuses it from any other address. Soularr runs on the host
+        # network and connects from 127.0.0.1; anyone who could use this key
+        # from there already has a shell on the machine.
+        web.authentication.api_keys.soularr = {
+          key = "7372e2c2968a79cee902babf0440b493ad2f966157324031";
+          cidr = "127.0.0.1/32,::1/128";
+        };
+
         directories = {
           downloads = "${soulseekDir}/complete";
           incomplete = "${soulseekDir}/incomplete";
@@ -1013,6 +1025,40 @@ in
       extraOptions = [ "--add-host=host.containers.internal:host-gateway" ];
     };
 
+    # ---- Soularr ---------------------------------------------------------
+    # The bridge that makes Soulseek a source for Lidarr rather than a
+    # separate thing you drive by hand. Every five minutes it reads Lidarr's
+    # list of wanted albums, searches Soulseek for each, downloads through
+    # slskd, and asks Lidarr to import the result. You say "I want this
+    # album" once, in Lidarr; which network it came from stops mattering,
+    # and it lands renamed and tagged like everything else.
+    #
+    # Host network, not the podman bridge: it only ever talks to Lidarr and
+    # slskd, both on this machine, and on the host network that is plain
+    # localhost — no firewall exceptions, and the loopback-fenced slskd key
+    # above works as-is.
+    #
+    # The download folder is mounted at the SAME path inside and out. Soularr
+    # tells Lidarr "import from <path>", and Lidarr resolves that path on
+    # the host; if the two disagreed, every import would fail on a folder
+    # Lidarr cannot see.
+    #
+    # Its config.ini carries Lidarr's API key and lives only on the server
+    # at /var/lib/soularr/config.ini — never in this repository.
+    virtualisation.oci-containers.containers.soularr = {
+      image = "ghcr.io/mrusse/soularr@sha256:c4f97924fabfce4e0de539d821ea7d20519b95c4815a707bacfc9d7212597f20";
+      volumes = [
+        "/var/lib/soularr:/data"
+        "${soulseekDir}/complete:${soulseekDir}/complete"
+      ];
+      environment = {
+        SCRIPT_INTERVAL = "300";
+        WEBUI_PORT = toString ports.soularr;
+        TZ = config.time.timeZone;
+      };
+      extraOptions = [ "--network=host" ];
+    };
+
     virtualisation.oci-containers.containers.threadfin = {
       # Same digest-pinning reasoning as above.
       image = "docker.io/fyb3roptik/threadfin@sha256:863fb0c2945617b4aa48b79eaa655954df72d68fbee6e49a1465934ceb3f057e";
@@ -1160,6 +1206,14 @@ in
               };
             }
             {
+              "Soularr" = {
+                href = "http://${config.networking.hostName}:${toString ports.soularr}";
+                siteMonitor = "http://localhost:${toString ports.soularr}";
+                description = "Lidarr → Soulseek, automatycznie";
+                icon = "soulseek.png";
+              };
+            }
+            {
               "Lidarr" = {
                 href = "http://${config.networking.hostName}:${toString ports.lidarr}";
                 siteMonitor = "http://localhost:${toString ports.lidarr}";
@@ -1303,6 +1357,7 @@ in
       ''}"
     ];
     systemd.services.podman-threadfin = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.podman-soularr = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; after = [ "lidarr.service" "slskd.service" ]; };
     systemd.services.podman-book-downloader = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.slskd = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
 
