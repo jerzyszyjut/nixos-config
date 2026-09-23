@@ -1276,6 +1276,27 @@ in
     # keep a lock on the library and be exactly the kind of surprise this
     # target exists to prevent.
     systemd.services.podman-cwa = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+
+    # CWA's init chowns the ingest folder on every container start, and the
+    # folder comes out of it as 0755 — owner-only write. tmpfiles sets 2775
+    # at boot, but anything that restarts the container (a rebuild, a crash,
+    # `systemctl restart`) quietly undoes it, and then jerzy — who is in
+    # `media` precisely so he can drop books there — gets "Permission
+    # denied" on the one folder whose whole purpose is receiving files.
+    #
+    # NETWORK_SHARE_MODE=true would skip that chown, but it also changes
+    # SQLite journaling and the ingest watcher, which is far more than this
+    # needs. So instead: after the container is up and its init has had
+    # time to run, put the mode back. "+" runs it as root; the sleep is the
+    # window for cwa-init, which starts after podman reports the container
+    # ready rather than before.
+    systemd.services.podman-cwa.serviceConfig.ExecStartPost = [
+      "+${pkgs.writeShellScript "cwa-ingest-perms" ''
+        sleep 30
+        ${pkgs.coreutils}/bin/chgrp media ${bookIngestDir}
+        ${pkgs.coreutils}/bin/chmod 2775 ${bookIngestDir}
+      ''}"
+    ];
     systemd.services.podman-threadfin = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.podman-book-downloader = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.slskd = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
