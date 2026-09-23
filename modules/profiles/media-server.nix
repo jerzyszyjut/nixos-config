@@ -543,7 +543,12 @@ in
     # It holds no data of yours, but it is a service that fetches an arbitrary
     # URL in a real browser on request — a comfortable relay for anyone who can
     # reach it. Prowlarr talks to it over loopback, so nothing else needs to.
-    systemd.services.flaresolverr.environment.HOST = "127.0.0.1";
+    # 0.0.0.0, not 127.0.0.1: Shelfmark runs in a container and reaches
+    # FlareSolverr over the podman bridge, where loopback is the container's
+    # own. It stays invisible from the LAN — 8191 is opened on podman0 only,
+    # below — and on tailscale0, which is trusted, it is a solver with no
+    # state worth reaching.
+    systemd.services.flaresolverr.environment.HOST = "0.0.0.0";
 
     # ---- Radarr ----------------------------------------------------------
     # The one-click part: search a film, press Add, and it does the rest.
@@ -1350,7 +1355,10 @@ in
       # source, which is the one genuinely useful thing it does beyond
       # shadow libraries: the same indexers that already serve films and
       # music, searched for books.
-      interfaces."podman0".allowedTCPPorts = [ ports.prowlarr ];
+      # FlareSolverr joins it for the same container: Anna's Archive sits
+      # behind Cloudflare, and without a solver Shelfmark gets the challenge
+      # page back instead of the book.
+      interfaces."podman0".allowedTCPPorts = [ ports.prowlarr ports.flaresolverr ];
     };
 
     # ---- optional extras -------------------------------------------------
