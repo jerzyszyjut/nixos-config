@@ -147,6 +147,10 @@ Całość: ~45 min.
    - **napiprojekt** (bez konta, najlepszy do polskich)
    - **OpenSubtitles.com** (darmowe konto, ~20 napisów/dzień)
    - **Podnapisi** (bez konta)
+5. Settings → Subtitles → *Audio Synchronization / Alignment*
+   - włącz **Automatic Subtitles Audio Synchronization**, progi wyłączone
+   - wyrównuje każde pobrane napisy do ścieżki dźwiękowej (przesunięcie i fps)
+   - istniejące napisy: film → ikona napisów → **Sync**
 
 ---
 
