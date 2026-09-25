@@ -49,11 +49,87 @@ in
         machine, which is the right answer if one host does both jobs.
       '';
     };
+
+    tvp = {
+      enable = lib.mkEnableOption ''
+        a Polish exit for TVP only: Firefox sends *.tvp.pl through Mullvad's
+        SOCKS proxy in Warsaw, everything else goes out as usual.
+
+        Needs its own Mullvad device key in sops as mullvad/tvp_key
+      '';
+
+      address = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "The address Mullvad assigned to the mullvad/tvp_key device.";
+      };
+
+      domains = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "tvp.pl" "tvp.info" "redcdn.pl" ];
+        description = ''
+          Domains (and their subdomains) sent through Poland. tvp.pl covers
+          the site, api.tvp.pl's geo check, the player and the stream CDN;
+          redcdn.pl is the CDN TVP has used for some streams. The geo check
+          and the stream must leave from the same country, so keep them
+          together.
+        '';
+      };
+    };
   };
 
-  # Nothing system-level is needed for the clients themselves — mpv, vlc and
-  # jellyfin-media-player are plain user packages, and the hardware decoding
-  # they use comes from the Mesa/VA-API stack that modules/nixos/desktop.nix
-  # already installs for every machine with a screen. So there is no `config`
-  # block here at all; see home/jerzy/entertainment.nix for the real content.
+  # =========================================================================
+  # TVP FROM ABROAD, WITHOUT A FULL VPN
+  #
+  # The tunnel carries exactly one address: Mullvad's in-tunnel SOCKS5
+  # proxy, 10.64.0.1, which exits wherever the tunnel lands — Warsaw here.
+  # allowedIPs is that /32, so the only route the interface adds is for
+  # that /32; nothing else on the machine can end up in it by accident.
+  #
+  # Choosing WHAT goes through it is then Firefox's job, via a PAC file:
+  # TVP domains to the proxy, everything else DIRECT. Name resolution for
+  # proxied requests happens at the proxy (SOCKS5 with remote DNS), so TVP
+  # also sees a Polish resolver, not just a Polish address.
+  #
+  # Firefox only. Other programs are untouched — which is the point.
+  # =========================================================================
+  config = lib.mkIf (cfg.enable && cfg.tvp.enable) {
+    sops.secrets."mullvad/tvp_key".mode = "0400";
+
+    networking.wireguard.interfaces.wg-tvp = {
+      ips = [ cfg.tvp.address ];
+      privateKeyFile = config.sops.secrets."mullvad/tvp_key".path;
+      peers = [{
+        # pl-waw-wg-202 (M247). Not just any Warsaw server: TVP's CDN
+        # answers 403 to the DataPacket-hosted ones (101-103), while the
+        # M247 pair gets the stream. Tested 2026-09-25.
+        publicKey = "nyfOkamv1ryTS62lsmyU96cqI0dtqek84DhyxWgAQGY=";
+        endpoint = "146.70.144.34:51820";
+        allowedIPs = [ "10.64.0.1/32" ];
+        persistentKeepalive = 25;
+      }];
+    };
+
+    environment.etc."firefox/tvp.pac".text = ''
+      function FindProxyForURL(url, host) {
+        var d = ${builtins.toJSON cfg.tvp.domains};
+        for (var i = 0; i < d.length; i++)
+          if (host === d[i] || dnsDomainIs(host, "." + d[i]))
+            return "SOCKS5 10.64.0.1:1080";
+        return "DIRECT";
+      }
+    '';
+
+    programs.firefox.policies.Proxy = {
+      Mode = "autoConfig";
+      AutoConfigURL = "file:///etc/firefox/tvp.pac";
+      UseProxyForDNS = true;
+      Locked = false;
+    };
+
+    assertions = [{
+      assertion = cfg.tvp.address != "";
+      message = "profiles.entertainment.tvp.enable needs tvp.address from the Mullvad device.";
+    }];
+  };
 }

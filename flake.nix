@@ -165,6 +165,9 @@
             # Tailscale, and nothing that downloads or transcodes.
             entertainment.enable = true;
             entertainment.serverHost = "kino";
+            # TVP Sport from Austria: Firefox sends only *.tvp.pl via Warsaw.
+            entertainment.tvp.enable = true;
+            entertainment.tvp.address = "10.158.203.118/32";
 
             # Explicit rather than merely absent: this laptop used to run the
             # whole stack, and the line is here so it is obvious that not
@@ -228,13 +231,15 @@
             mediaServer.vpn.peer.publicKey = "chvEpRH+05o+ESv8QLzNyY3Phirsym0mUvF03Kt7oCo=";
             mediaServer.vpn.peer.endpoint = "193.32.127.71:51820";
 
-            # Second tunnel, Warsaw (pl-waw-wg-101), for Jellyfin only: the
-            # Polish IPTV channels (TVP, Polsat) are geo-blocked. Own key in
-            # /var/lib/mullvad/streams.key, registered as its own device.
+            # Second tunnel, Warsaw, for Jellyfin only: the Polish IPTV
+            # channels are geo-blocked. Own key in /var/lib/mullvad/streams.key,
+            # registered as its own device. pl-waw-wg-201 (M247) on purpose:
+            # TVP's CDN answers 403 to the DataPacket-hosted Warsaw servers
+            # (101-103), tested 2026-09-25.
             mediaServer.vpn.streams.enable = true;
             mediaServer.vpn.streams.address = "10.141.29.3/32";
-            mediaServer.vpn.streams.peer.publicKey = "fO4beJGkKZxosCZz1qunktieuPyzPnEVKVQNhzanjnA=";
-            mediaServer.vpn.streams.peer.endpoint = "45.134.212.66:51820";
+            mediaServer.vpn.streams.peer.publicKey = "XwFAczY5LdogFwE9soDecXWqywSCDGuRyJhr/0psI00=";
+            mediaServer.vpn.streams.peer.endpoint = "45.128.38.226:51820";
 
             # No desktop.enable: headless on purpose. A TTY and SSH over
             # Tailscale are the two ways in, and that is enough — the first
