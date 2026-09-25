@@ -228,6 +228,14 @@
             mediaServer.vpn.peer.publicKey = "chvEpRH+05o+ESv8QLzNyY3Phirsym0mUvF03Kt7oCo=";
             mediaServer.vpn.peer.endpoint = "193.32.127.71:51820";
 
+            # Second tunnel, Warsaw (pl-waw-wg-101), for Jellyfin only: the
+            # Polish IPTV channels (TVP, Polsat) are geo-blocked. Own key in
+            # /var/lib/mullvad/streams.key, registered as its own device.
+            mediaServer.vpn.streams.enable = true;
+            mediaServer.vpn.streams.address = "10.141.29.3/32";
+            mediaServer.vpn.streams.peer.publicKey = "fO4beJGkKZxosCZz1qunktieuPyzPnEVKVQNhzanjnA=";
+            mediaServer.vpn.streams.peer.endpoint = "45.134.212.66:51820";
+
             # No desktop.enable: headless on purpose. A TTY and SSH over
             # Tailscale are the two ways in, and that is enough — the first
             # `tailscale up` has to be typed at the machine, which a TTY

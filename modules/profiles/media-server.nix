@@ -155,6 +155,49 @@ in
           description = "The server's Endpoint from the Mullvad config.";
         };
       };
+
+      # A second, independent tunnel for services that need to appear in
+      # another country (geo-blocked IPTV), so torrents can stay where they
+      # are. Needs its own Mullvad key: two tunnels sharing one key would
+      # share one inner address, and the torrent rule matches on that.
+      streams = {
+        enable = lib.mkEnableOption "a second Mullvad tunnel for geo-blocked streams";
+
+        address = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Address line from this tunnel's own Mullvad config.";
+        };
+
+        privateKeyFile = lib.mkOption {
+          type = lib.types.str;
+          default = "/var/lib/mullvad/streams.key";
+          description = "File holding only this tunnel's PrivateKey value, chmod 600.";
+        };
+
+        peer = {
+          publicKey = lib.mkOption {
+            type = lib.types.str;
+            default = "";
+            description = "The server's PublicKey from this tunnel's config.";
+          };
+          endpoint = lib.mkOption {
+            type = lib.types.str;
+            default = "";
+            description = "The server's Endpoint from this tunnel's config.";
+          };
+        };
+
+        users = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "jellyfin" ];
+          description = ''
+            Services whose internet traffic leaves through this tunnel,
+            matched by the user they run as. LAN and tailscale traffic keeps
+            the ordinary route, so clients still reach them.
+          '';
+        };
+      };
     };
 
     autostart = lib.mkOption {
@@ -503,7 +546,66 @@ in
       '';
     };
 
-    assertions = lib.optionals cfg.vpn.enable [
+    # =====================================================================
+    # THE STREAMS TUNNEL
+    #
+    # Same shape as the one above (no routes of its own, table 51821), but
+    # traffic reaches it by uid rather than by source address:
+    #   6000  main table, ignoring its default route — the LAN and loopback
+    #         keep their specific routes, so a TV on the wifi gets replies;
+    #   6001  everything else from that user goes to the tunnel.
+    # Both sit after tailscale's rules (52xx), so tailnet replies are routed
+    # before these are consulted. No kill switch on purpose: if this tunnel
+    # drops, table 51821 is empty and Jellyfin falls back to the normal
+    # route — the Polish channels stop, nothing else does.
+    # =====================================================================
+    networking.wireguard.interfaces.wg-streams = lib.mkIf cfg.vpn.streams.enable (
+      let
+        ip = "${pkgs.iproute2}/bin/ip";
+        forUsers = f: lib.concatMapStrings (u: ''
+          uid=$(${pkgs.coreutils}/bin/id -u ${u})
+          ${f}
+        '') cfg.vpn.streams.users;
+      in {
+        ips = [ cfg.vpn.streams.address ];
+        privateKeyFile = cfg.vpn.streams.privateKeyFile;
+        table = "off";
+        allowedIPsAsRoutes = false;
+
+        peers = [{
+          publicKey = cfg.vpn.streams.peer.publicKey;
+          endpoint = cfg.vpn.streams.peer.endpoint;
+          allowedIPs = [ "0.0.0.0/0" "::/0" ];
+          persistentKeepalive = 25;
+        }];
+
+        postSetup = ''
+          ${ip} route add default dev wg-streams table 51821
+          ${forUsers ''
+            ${ip} rule add uidrange $uid-$uid lookup main suppress_prefixlength 0 priority 6000
+            ${ip} rule add uidrange $uid-$uid lookup 51821 priority 6001
+          ''}
+        '';
+
+        postShutdown = ''
+          ${forUsers ''
+            ${ip} rule del uidrange $uid-$uid lookup main suppress_prefixlength 0 priority 6000 || true
+            ${ip} rule del uidrange $uid-$uid lookup 51821 priority 6001 || true
+          ''}
+          ${ip} route del default dev wg-streams table 51821 || true
+        '';
+      });
+
+    assertions = lib.optionals cfg.vpn.streams.enable [
+      {
+        assertion = cfg.vpn.streams.address != "" && cfg.vpn.streams.peer.publicKey != "" && cfg.vpn.streams.peer.endpoint != "";
+        message = ''
+          profiles.mediaServer.vpn.streams.enable is on but address /
+          peer.publicKey / peer.endpoint are empty. Fill them in from the
+          second WireGuard config Mullvad generates.
+        '';
+      }
+    ] ++ lib.optionals cfg.vpn.enable [
       {
         assertion = cfg.vpn.address != "" && cfg.vpn.peer.publicKey != "" && cfg.vpn.peer.endpoint != "";
         message = ''
