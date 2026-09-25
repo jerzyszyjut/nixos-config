@@ -1125,6 +1125,11 @@ in
         # CWA's database, READ-ONLY, so the downloader can grey out books
         # the library already has instead of fetching them twice.
         "/var/lib/cwa/config/app.db:/auth/app.db:ro"
+        # Completed torrents, at the same path qBittorrent reports them
+        # under, so Shelfmark can copy a finished book into the ingest
+        # folder without any path mapping. Read-only: the torrent keeps
+        # seeding from its own copy.
+        "${downloadDir}:${downloadDir}:ro"
       ];
 
       ports = [ "${toString ports.bookDownloader}:8084" ];
@@ -1536,7 +1541,11 @@ in
       # FlareSolverr joins it for the same container: Anna's Archive sits
       # behind Cloudflare, and without a solver Shelfmark gets the challenge
       # page back instead of the book.
-      interfaces."podman0".allowedTCPPorts = [ ports.prowlarr ports.flaresolverr ];
+      # qBittorrent, so a book Shelfmark finds through Prowlarr can actually
+      # be downloaded: Shelfmark hands the torrent to qBittorrent (category
+      # "books") and picks the file up from downloadDir when it completes.
+      # This path authenticates — LocalHostAuth only waives it for 127.0.0.1.
+      interfaces."podman0".allowedTCPPorts = [ ports.prowlarr ports.flaresolverr ports.qbittorrent ];
     };
 
     # ---- optional extras -------------------------------------------------
