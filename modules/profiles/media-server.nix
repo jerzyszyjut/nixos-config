@@ -379,14 +379,13 @@ in
             # standing there would be qBittorrent's default admin /
             # adminadmin, which is not a secret.
             #
-            # PBKDF2-HMAC-SHA512, 100k iterations, 16-byte salt — the format
-            # qBittorrent stores natively. It is a HASH of a 20-character
-            # random password, so it is safe in a public repo. Declared here
-            # rather than set in the UI because this module rewrites
-            # qBittorrent.conf from serverConfig on every start, so anything
-            # set through the web interface is erased by the next restart.
+            # The password hash is NOT here: this repository is public, and
+            # even a salted PBKDF2 hash is something to crack offline. It
+            # lives in qbittorrentPasswordFile on the server only and is
+            # spliced into qBittorrent.conf at start (see ExecStartPre
+            # below), since this module rewrites the file from serverConfig
+            # on every start and a password set in the UI would not survive.
             Username = "jerzy";
-            Password_PBKDF2 = "@ByteArray(Y+NDjHujvj5lH2KH3aNbfw==:Cha6AYL0SGUfs95va+HZ+YK94cCFSVlALtahsunyNlD4oObzCaK6Cnbb10l0DRaUgHGLCxA6F5enRwen5eodUw==)";
 
             # The UI is now reachable by name, so the Host header will be
             # "kino:8080" rather than an address. qBittorrent rejects
@@ -483,6 +482,22 @@ in
     # group-writable and Radarr is allowed to hardlink it. See the note on
     # protected_hardlinks above.
     systemd.services.qbittorrent.serviceConfig.UMask = "0002";
+
+    # The web UI password hash, kept out of the repository. Runs after the
+    # module's own ExecStartPre has installed a fresh qBittorrent.conf, and
+    # splices the hash in under [Preferences]. The file holds only the
+    # "@ByteArray(salt:hash)" value, owned by qbittorrent, mode 600. If it
+    # is missing the UI falls back to qBittorrent's own default — the *arr
+    # apps are unaffected either way, they come in over localhost.
+    systemd.services.qbittorrent.serviceConfig.ExecStartPre = lib.mkAfter [
+      (pkgs.writeShellScript "qbittorrent-password" ''
+        f=/var/lib/qBittorrent/webui-password
+        conf=/var/lib/qBittorrent/qBittorrent/config/qBittorrent.conf
+        [ -r "$f" ] || exit 0
+        hash=$(${pkgs.coreutils}/bin/cat "$f")
+        ${pkgs.gnused}/bin/sed -i "/^\[Preferences\]$/a WebUI\\\\Password_PBKDF2=\"$hash\"" "$conf"
+      '')
+    ];
 
     # =====================================================================
     # THE VPN, AND WHY IT TOUCHES NOTHING ELSE
@@ -742,15 +757,10 @@ in
 
         soulseek.listen_port = ports.slskdListen;
 
-        # For Soularr. This key has to live in settings, which means the Nix
-        # store and this repository, so it is fenced to loopback: slskd
-        # refuses it from any other address. Soularr runs on the host
-        # network and connects from 127.0.0.1; anyone who could use this key
-        # from there already has a shell on the machine.
-        web.authentication.api_keys.soularr = {
-          key = "7372e2c2968a79cee902babf0440b493ad2f966157324031";
-          cidr = "127.0.0.1/32,::1/128";
-        };
+        # Soularr's API key is deliberately absent: settings end up in the
+        # store and this public repository. It is SLSKD_API_KEY in the
+        # server-only environment file (/var/lib/slskd/slskd.env), next to
+        # the Soulseek login.
 
         directories = {
           downloads = "${soulseekDir}/complete";
