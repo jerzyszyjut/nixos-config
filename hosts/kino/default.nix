@@ -234,6 +234,14 @@
   #
   # The real fix is the ethernet port, which this machine has and is not
   # using. This makes wifi survivable, not good.
+  #
+  # Wifi power saving is off for the same reason. With the lid shut the
+  # antennas (in the display frame) sit at about -66 dBm, and in that state
+  # the kernel logged ~45 beacon losses a day on 2026-09-26. The radio
+  # dozing between beacons is the last thing a weak link needs, and a
+  # server on mains power saves nothing worth having by doing it.
+  networking.networkmanager.wifi.powersave = false;
+
   systemd.services.net-watchdog = {
     description = "Bounce the network connection if the gateway goes unreachable";
     serviceConfig.Type = "oneshot";
