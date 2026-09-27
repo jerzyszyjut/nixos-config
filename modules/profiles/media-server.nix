@@ -539,7 +539,7 @@ in
     # NIGHT-ONLY DOWNLOADS
     #
     # Radarr/Sonarr grab whenever you ask; this decides when the bytes move.
-    # Every five minutes:
+    # Every minute:
     #   - by day, any unfinished torrent in the listed categories that is
     #     not force-started gets stopped and tagged "noc";
     #   - by night, everything tagged "noc" is started again and untagged.
@@ -570,10 +570,26 @@ in
         fi
 
         # Upload limit follows the same window (bytes/s for the API).
+        # So does "add torrents stopped": without it, anything Radarr or
+        # Sonarr grabbed by day ran at full speed until this job's next
+        # pass, and a batch of requests saturated the link for minutes
+        # (2026-09-27, mid-stream). By day new torrents arrive stopped;
+        # the pass below tags the film/series ones for the night and starts
+        # everything else (books, music) straight away.
         if [ "$night" = 1 ]; then
           curl -sf "$api/transfer/setUploadLimit" --data-urlencode "limit=${toString (config.services.qbittorrent.serverConfig.BitTorrent.Session.GlobalUPSpeedLimit * 1024)}"
+          curl -sf "$api/app/setPreferences" --data-urlencode 'json={"add_stopped_enabled":false}'
         else
           curl -sf "$api/transfer/setUploadLimit" --data-urlencode "limit=${toString (cfg.nightDownloads.dayUploadLimit * 1024)}"
+          curl -sf "$api/app/setPreferences" --data-urlencode 'json={"add_stopped_enabled":true}'
+          fresh=$(curl -sf "$api/torrents/info" | jq -c --argjson cats '${builtins.toJSON cfg.nightDownloads.categories}' --argjson now "$(date +%s)" '
+            [ .[] | select(.progress < 1 and (.state | test("^stopped")) and (.tags | test("noc") | not)
+                           and .added_on > ($now - 900))
+              | {hash, ours: (.category as $c | $cats | index($c) != null)} ]')
+          tag=$(echo "$fresh" | jq -r '[.[] | select(.ours) | .hash] | join("|")')
+          go=$(echo "$fresh" | jq -r '[.[] | select(.ours | not) | .hash] | join("|")')
+          [ -n "$tag" ] && curl -sf "$api/torrents/addTags" --data-urlencode "hashes=$tag" --data-urlencode tags=noc && echo "day: new, held for night: $tag"
+          [ -n "$go" ] && curl -sf "$api/torrents/start" --data-urlencode "hashes=$go" && echo "day: new, not a film/series, started: $go"
         fi
 
         if [ "$night" = 1 ]; then
@@ -599,7 +615,7 @@ in
     systemd.timers.qbittorrent-night = lib.mkIf cfg.nightDownloads.enable {
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "*:0/5";
+        OnCalendar = "*:0/1";
         Persistent = true;
       };
     };
