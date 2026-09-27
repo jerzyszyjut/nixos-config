@@ -30,6 +30,15 @@ lib.mkIf cfg.enable {
     # using the Tailscale name — see `serverHost` in the profile module.
     jellyfin-media-player
 
+    # Jellyfin Desktop 2.0 sometimes loads the server's page without its mpv
+    # player attached, and then behaves like a browser: burned-in subtitles,
+    # full transcodes. mpv-shim sidesteps that. It sits in the tray and shows
+    # up in Jellyfin's "play on" (cast) menu; pick it from any client and the
+    # file opens in mpv as-is — original video, any subtitle format, 5.1.
+    # Started by Hyprland (dotfiles/hypr/hyprland.conf); asks for the server
+    # and login once, on first run.
+    jellyfin-mpv-shim
+
     # mpv is the one that opens instantly when you just want to play a file
     # off disk without a library in the way. vlc stays for the awkward formats
     # and for casting to a TV.
