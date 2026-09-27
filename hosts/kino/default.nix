@@ -251,15 +251,27 @@
     # have sat there failing silently every two minutes while the thing it
     # was supposed to be guarding went unguarded.
     path = [ pkgs.iputils pkgs.networkmanager pkgs.iproute2 pkgs.gawk pkgs.coreutils ];
+    # The first version bounced on a single failed check (2 pings, 3 s),
+    # and the router here drops ICMP for a few seconds when it is busy. So
+    # the watchdog itself was taking the machine offline ~10 times a day,
+    # mid-stream. Now the link counts as down only if NEITHER the gateway
+    # NOR the internet answers any of several pings, and only after that
+    # has held for two consecutive runs (~4 minutes). A real outage still
+    # gets bounced; a hiccup no longer turns into one.
     script = ''
+      state=/run/net-watchdog.failed
       gw=$(ip route show default | awk '/default/ {print $3; exit}')
-      if [ -z "$gw" ]; then
-        echo "no default route at all; bouncing"
-      elif ping -c 2 -W 3 "$gw" >/dev/null 2>&1; then
+      if [ -n "$gw" ] && { ping -c 5 -i 0.5 -W 2 "$gw" >/dev/null 2>&1 || ping -c 3 -W 3 1.1.1.1 >/dev/null 2>&1; }; then
+        rm -f "$state"
         exit 0
-      else
-        echo "gateway $gw unreachable; bouncing"
       fi
+      if [ ! -e "$state" ]; then
+        touch "$state"
+        echo "link looks down (gw=''${gw:-none}); will bounce if it still is next run"
+        exit 0
+      fi
+      rm -f "$state"
+      echo "link down for two runs (gw=''${gw:-none}); bouncing"
 
       # `nmcli connection up` rather than restarting NetworkManager: it is
       # narrower, and restarting NM tears down the tailscale0 route with it.
