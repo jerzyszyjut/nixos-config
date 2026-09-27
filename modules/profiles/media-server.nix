@@ -223,6 +223,17 @@ in
         default = [ "radarr" "tv-sonarr" ];
         description = "qBittorrent categories the window applies to.";
       };
+
+      dayUploadLimit = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 500;
+        description = ''
+          qBittorrent's global upload limit by day, in KiB/s (500 ≈ 4 Mb/s).
+          At night it goes back to the normal GlobalUPSpeedLimit. By day the
+          only torrents running are force-started ones, and the uplink is
+          wanted for Jellyfin.
+        '';
+      };
     };
 
     autostart = lib.mkOption {
@@ -558,6 +569,13 @@ in
           { [ "$h" -ge "$from" ] || [ "$h" -lt "$until" ]; } && night=1 || night=0
         fi
 
+        # Upload limit follows the same window (bytes/s for the API).
+        if [ "$night" = 1 ]; then
+          curl -sf "$api/transfer/setUploadLimit" --data-urlencode "limit=${toString (config.services.qbittorrent.serverConfig.BitTorrent.Session.GlobalUPSpeedLimit * 1024)}"
+        else
+          curl -sf "$api/transfer/setUploadLimit" --data-urlencode "limit=${toString (cfg.nightDownloads.dayUploadLimit * 1024)}"
+        fi
+
         if [ "$night" = 1 ]; then
           hashes=$(curl -sf "$api/torrents/info?tag=noc" | jq -r '[.[].hash] | join("|")')
           [ -z "$hashes" ] && exit 0
@@ -868,6 +886,15 @@ in
         # are not. To turn this off, empty the list — and expect queues that
         # never advance.
         shares.directories = [ musicDir ];
+
+        # The uplink is ~30 Mb/s and Jellyfin streams to friends go out the
+        # same pipe. 600 KiB/s (~5 Mb/s) across two slots keeps sharing
+        # alive — see above for why that matters — without ever taking
+        # more than a sixth of it.
+        global.upload = {
+          slots = 2;
+          speed_limit = 600;
+        };
       };
     };
 
