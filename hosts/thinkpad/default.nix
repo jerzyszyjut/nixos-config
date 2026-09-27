@@ -67,6 +67,13 @@
       CPU_MIN_PERF_ON_BAT = 0;
       CPU_MAX_PERF_ON_BAT = 20;
 
+      # Wifi power saving only on battery. Plugged in, the radio dozing
+      # between beacons showed up as 16% packet loss and 1.5 s spikes to the
+      # router while streaming to Discord (2026-09-27) — lag for everyone
+      # watching, to save power nobody needs on AC.
+      WIFI_PWR_ON_AC = "off";
+      WIFI_PWR_ON_BAT = "on";
+
       START_CHARGE_THRESH_BAT0 = 40; # Starts charging when below 40%
       STOP_CHARGE_THRESH_BAT0 = 80;  # Stops charging when reaching 80
     };
