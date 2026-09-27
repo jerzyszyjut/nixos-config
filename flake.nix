@@ -252,6 +252,9 @@
             # media-autostart-on / media-autostart-off commands rewrite this
             # exact line and rebuild — keep it on one line for that reason.
             mediaServer.autostart = true;
+            # Films and series download 00:00–08:00; Force start in
+            # qBittorrent to get one right away.
+            mediaServer.nightDownloads.enable = true;
           };
         };
       };

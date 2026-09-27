@@ -200,6 +200,31 @@ in
       };
     };
 
+    nightDownloads = {
+      enable = lib.mkEnableOption ''
+        downloading films and series only at night. During the day their
+        torrents are stopped; Force start on one in qBittorrent exempts it
+      '';
+
+      from = lib.mkOption {
+        type = lib.types.ints.between 0 23;
+        default = 0;
+        description = "Hour the night window opens (downloads may run).";
+      };
+
+      until = lib.mkOption {
+        type = lib.types.ints.between 0 23;
+        default = 8;
+        description = "Hour the night window closes (downloads get stopped).";
+      };
+
+      categories = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "radarr" "tv-sonarr" ];
+        description = "qBittorrent categories the window applies to.";
+      };
+    };
+
     autostart = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -498,6 +523,68 @@ in
         ${pkgs.gnused}/bin/sed -i "/^\[Preferences\]$/a WebUI\\\\Password_PBKDF2=\"$hash\"" "$conf"
       '')
     ];
+
+    # =====================================================================
+    # NIGHT-ONLY DOWNLOADS
+    #
+    # Radarr/Sonarr grab whenever you ask; this decides when the bytes move.
+    # Every five minutes:
+    #   - by day, any unfinished torrent in the listed categories that is
+    #     not force-started gets stopped and tagged "noc";
+    #   - by night, everything tagged "noc" is started again and untagged.
+    # The tag is what keeps it from undoing a pause you made yourself: only
+    # torrents this job stopped are ever restarted by it.
+    #
+    # To get one film NOW: in qBittorrent, right-click it → Force start.
+    # Force-started torrents are skipped, day or night.
+    #
+    # Talks to the API over localhost, where LocalHostAuth is off, so it
+    # needs no credentials. Seeding (finished) torrents are never touched.
+    # =====================================================================
+    systemd.services.qbittorrent-night = lib.mkIf cfg.nightDownloads.enable {
+      description = "Stop film/series downloads by day, resume them at night";
+      after = [ "qbittorrent.service" ];
+      requisite = [ "qbittorrent.service" ];
+      path = [ pkgs.curl pkgs.jq pkgs.coreutils ];
+      serviceConfig.Type = "oneshot";
+      script = ''
+        api=http://127.0.0.1:${toString ports.qbittorrent}/api/v2
+        from=${toString cfg.nightDownloads.from}
+        until=${toString cfg.nightDownloads.until}
+        h=$(date +%-H)
+        if [ "$from" -le "$until" ]; then
+          { [ "$h" -ge "$from" ] && [ "$h" -lt "$until" ]; } && night=1 || night=0
+        else
+          { [ "$h" -ge "$from" ] || [ "$h" -lt "$until" ]; } && night=1 || night=0
+        fi
+
+        if [ "$night" = 1 ]; then
+          hashes=$(curl -sf "$api/torrents/info?tag=noc" | jq -r '[.[].hash] | join("|")')
+          [ -z "$hashes" ] && exit 0
+          curl -sf "$api/torrents/start" --data-urlencode "hashes=$hashes"
+          curl -sf "$api/torrents/removeTags" --data-urlencode "hashes=$hashes" --data-urlencode tags=noc
+          echo "night: started $hashes"
+        else
+          hashes=$(curl -sf "$api/torrents/info" | jq -r --argjson cats '${builtins.toJSON cfg.nightDownloads.categories}' '
+            [ .[] | select((.category as $c | $cats | index($c)) and .progress < 1
+                           and (.force_start | not)
+                           and (.state | test("^(stopped|paused|error|missingFiles)") | not))
+              | .hash ] | join("|")')
+          [ -z "$hashes" ] && exit 0
+          curl -sf "$api/torrents/addTags" --data-urlencode "hashes=$hashes" --data-urlencode tags=noc
+          curl -sf "$api/torrents/stop" --data-urlencode "hashes=$hashes"
+          echo "day: stopped $hashes"
+        fi
+      '';
+    };
+
+    systemd.timers.qbittorrent-night = lib.mkIf cfg.nightDownloads.enable {
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "*:0/5";
+        Persistent = true;
+      };
+    };
 
     # =====================================================================
     # THE VPN, AND WHY IT TOUCHES NOTHING ELSE
