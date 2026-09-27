@@ -91,6 +91,7 @@
     dig
     ethtool
     iperf3
+    speed-cloudflare-cli # speed.cloudflare.com from a terminal; picks a nearby server, unlike speedtest-cli
   ];
 
   # ---- eduroam -----------------------------------------------------------
