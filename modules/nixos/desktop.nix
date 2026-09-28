@@ -106,6 +106,12 @@ in
     # Tighter Bluetooth LE connection interval (7.5–11.25 ms instead of
     # BlueZ's 30–50 ms) and no slave latency. BLE mice (MX Vertical) move
     # in visible steps and stall every few seconds at the default spacing.
+    # Experimental = true also enables BlueZ's Ranging (RAP, Bluetooth 6.0
+    # channel sounding) profile. It tries to attach to every LE device on
+    # connect; the MX Vertical rejects it, and the log showed the mouse
+    # dropping and reconnecting every one to two minutes around those
+    # failures. Nothing here uses ranging.
+    disabledPlugins = [ "rap" ];
     settings.LE = {
       MinConnectionInterval = 6;
       MaxConnectionInterval = 9;
