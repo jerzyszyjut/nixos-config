@@ -74,6 +74,11 @@
       WIFI_PWR_ON_AC = "off";
       WIFI_PWR_ON_BAT = "on";
 
+      # Keep the Bluetooth adapter out of USB autosuspend. TLP suspended it
+      # after 2 s idle, and a Bluetooth mouse (MX Vertical) then stutters
+      # every time the adapter has to wake up for the next movement.
+      USB_EXCLUDE_BTUSB = 1;
+
       START_CHARGE_THRESH_BAT0 = 40; # Starts charging when below 40%
       STOP_CHARGE_THRESH_BAT0 = 80;  # Stops charging when reaching 80
     };
