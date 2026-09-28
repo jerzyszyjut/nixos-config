@@ -103,7 +103,21 @@ in
       Experimental = true;
       FastConnectable = true;
     };
+    # Tighter Bluetooth LE connection interval (7.5–11.25 ms instead of
+    # BlueZ's 30–50 ms) and no slave latency. BLE mice (MX Vertical) move
+    # in visible steps and stall every few seconds at the default spacing.
+    settings.LE = {
+      MinConnectionInterval = 6;
+      MaxConnectionInterval = 9;
+      ConnectionLatency = 0;
+    };
   };
+
+  # btusb suspends the adapter on its own, regardless of TLP — same effect,
+  # a mouse that stalls while the radio wakes.
+  boot.extraModprobeConfig = ''
+    options btusb enable_autosuspend=n
+  '';
 
   # Registers blueman's D-Bus mechanism service (org.blueman.Mechanism), which
   # blueman-manager needs for privileged actions — pairing, trusting,
