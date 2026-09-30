@@ -17,7 +17,11 @@
     #   ghcr.io/jerzyszyjut/jobpilot[-browser]:<rev> .`, bump the tag here.
     # Once the project tags releases and the GHCR packages are public, this
     # becomes a plain version string and the build step goes away.
-    imageTag = "c5c6b26";
+    # f06b205 is on the local branch flaresolverr-browser-fetch (not pushed
+    # as of 2026-09-30): browser-only hosts such as devjobs.at are fetched
+    # through FlareSolverr. The NixOS module is unchanged, so the flake input
+    # can stay on the older commit.
+    imageTag = "f06b205";
 
     # Secrets stay on the server, like the other services here: this
     # repository is public. Root-only file, created by hand; see
