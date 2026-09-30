@@ -15,6 +15,7 @@
     # exist until you run, ON THIS MACHINE:
     #   nixos-generate-config --root /mnt   (then copy it here)
     ./hardware-configuration.nix
+    ./jobpilot.nix
   ];
 
   networking.hostName = "kino";

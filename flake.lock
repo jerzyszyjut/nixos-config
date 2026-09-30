@@ -159,6 +159,26 @@
         "type": "github"
       }
     },
+    "jobpilot": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790774151,
+        "narHash": "sha256-H+oIHzPr0ay9X51fvQaX0KBJbOgXEitZWLtRyYzfN7E=",
+        "owner": "jerzyszyjut",
+        "repo": "jobpilot",
+        "rev": "c5c6b2672bc7d0bff639d921241029eb8b6940aa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jerzyszyjut",
+        "repo": "jobpilot",
+        "type": "github"
+      }
+    },
     "nixos-hardware": {
       "inputs": {
         "nixpkgs": "nixpkgs"
@@ -251,6 +271,7 @@
     "root": {
       "inputs": {
         "home-manager": "home-manager",
+        "jobpilot": "jobpilot",
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-unstable": "nixpkgs-unstable",
