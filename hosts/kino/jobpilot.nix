@@ -13,15 +13,17 @@
     # has no release tag yet, so nothing is published on GHCR. The tag is the
     # commit they were built from. oci-containers only pulls an image that is
     # missing locally, so these are used as they are. To update:
-    #   rsync the checkout to kino, `podman build --target app|browser -t
-    #   ghcr.io/jerzyszyjut/jobpilot[-browser]:<rev> .`, bump the tag here.
+    #   rsync the checkout to kino, `podman build --format docker --target
+    #   app|browser -t ghcr.io/jerzyszyjut/jobpilot[-browser]:<rev> .`, bump
+    #   the tag here. `--format docker` matters: podman's default OCI format
+    #   drops the images' HEALTHCHECK.
     # Once the project tags releases and the GHCR packages are public, this
     # becomes a plain version string and the build step goes away.
-    # e7a403c is on the local branch flaresolverr-browser-fetch (not pushed
-    # as of 2026-09-30): browser-only hosts such as devjobs.at are fetched
+    # d2df889 is the head of the branch flaresolverr-browser-fetch
+    # (2026-09-30): browser-only hosts such as devjobs.at are fetched
     # through FlareSolverr. The NixOS module is unchanged, so the flake input
     # can stay on the older commit.
-    imageTag = "e7a403c";
+    imageTag = "d2df889";
 
     # Secrets stay on the server, like the other services here: this
     # repository is public. Root-only file, created by hand; see
