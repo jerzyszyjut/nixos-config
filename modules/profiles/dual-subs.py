@@ -1,7 +1,7 @@
 """Build two-language subtitle files for language learning.
 
 For every video under the given directories that has subtitles in both
-languages, write "<video>.<A>+<B>.und.srt" showing language A with language
+languages, write "<video>.<A>+<B>.<a>.srt" showing language A with language
 B in italics underneath. Sources are the external .srt files Bazarr
 downloads, falling back to a text subtitle track embedded in the video.
 
@@ -106,7 +106,7 @@ def external(video, lang):
         if not path.startswith(base + ".") or not name.lower().endswith(".srt"):
             continue
         tokens = name[len(os.path.basename(base)) + 1:-4].lower().split(".")
-        if "und" in tokens or not set(tokens) & CODES[lang]:
+        if any("+" in t for t in tokens) or not set(tokens) & CODES[lang]:
             continue
         rank = ("forced" in tokens, "hi" in tokens or "sdh" in tokens)
         if best is None or rank < best[0]:
@@ -149,7 +149,10 @@ def main():
                 if os.path.splitext(name)[1].lower() not in VIDEO_EXT:
                     continue
                 video = os.path.join(folder, name)
-                target = f"{os.path.splitext(video)[0]}.{lang_a.upper()}+{lang_b.upper()}.und.srt"
+                stem = f"{os.path.splitext(video)[0]}.{lang_a.upper()}+{lang_b.upper()}"
+                target = f"{stem}.{lang_a}.srt"
+                if os.path.exists(f"{stem}.und.srt"):  # name used before 2026-09-30
+                    os.replace(f"{stem}.und.srt", target)
                 with tempfile.TemporaryDirectory() as tmp:
                     ext_a, ext_b = external(video, lang_a), external(video, lang_b)
                     newest = max((os.path.getmtime(p) for p in (ext_a, ext_b, video) if p))
