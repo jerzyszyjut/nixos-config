@@ -238,8 +238,8 @@ in
 
     dualSubtitles = {
       enable = lib.mkEnableOption ''
-        two-language subtitle files for films (language learning): wherever
-        a film has subtitles in both languages, a third "<A>+<B>" track is
+        two-language subtitle files for films and series (language learning): wherever
+        a video has subtitles in both languages, a third "<A>+<B>" track is
         written with the first language on top and the second in italics
       '';
 
@@ -641,7 +641,7 @@ in
     # language already exist — it cannot mask a missing one.
     #
     # Runs as bazarr, which already owns the other subtitle files and has
-    # group write on the library. Films only; outputs newer than their
+    # group write on the library. Films and series; outputs newer than their
     # sources are skipped, so the half-hourly pass is cheap.
     # =====================================================================
     systemd.services.dual-subtitles = lib.mkIf cfg.dualSubtitles.enable {
@@ -652,7 +652,7 @@ in
         Group = "media";
         UMask = "0002";
         Nice = 10;
-        ExecStart = "${pkgs.python3}/bin/python3 ${./dual-subs.py} ${lib.concatStringsSep " " cfg.dualSubtitles.languages} ${pkgs.jellyfin-ffmpeg}/bin ${moviesDir}";
+        ExecStart = "${pkgs.python3}/bin/python3 ${./dual-subs.py} ${lib.concatStringsSep " " cfg.dualSubtitles.languages} ${pkgs.jellyfin-ffmpeg}/bin ${moviesDir} ${tvDir}";
       };
     };
 

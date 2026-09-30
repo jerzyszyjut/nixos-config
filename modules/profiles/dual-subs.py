@@ -123,20 +123,27 @@ def embedded(video, lang, ffmpeg, tmpdir):
             capture_output=True, text=True, timeout=120).stdout or "{}")
     except (subprocess.SubprocessError, json.JSONDecodeError):
         return None
+    # Plain tracks first; an SDH one (sound descriptions included) only when
+    # it is all there is — Dark's second season ships German as SDH only.
+    found = []
     for n, stream in enumerate(probe.get("streams", [])):
         tags = stream.get("tags", {})
         title = tags.get("title", "").lower()
+        disposition = stream.get("disposition", {})
         if (stream.get("codec_name") in TEXT_CODECS
                 and tags.get("language", "").lower() in CODES[lang]
-                and not stream.get("disposition", {}).get("forced")
-                and "commentary" not in title and "sdh" not in title):
-            out = os.path.join(tmpdir, f"{lang}.srt")
-            done = subprocess.run(
-                [os.path.join(ffmpeg, "ffmpeg"), "-v", "error", "-y", "-i", video,
-                 "-map", f"0:s:{n}", "-f", "srt", out],
-                capture_output=True, timeout=600)
-            if done.returncode == 0 and os.path.getsize(out) > 0:
-                return out
+                and not disposition.get("forced")
+                and "commentary" not in title and "forced" not in title):
+            sdh = "sdh" in title or bool(disposition.get("hearing_impaired"))
+            found.append((sdh, n))
+    for _, n in sorted(found):
+        out = os.path.join(tmpdir, f"{lang}.srt")
+        done = subprocess.run(
+            [os.path.join(ffmpeg, "ffmpeg"), "-v", "error", "-y", "-i", video,
+             "-map", f"0:s:{n}", "-f", "srt", out],
+            capture_output=True, timeout=600)
+        if done.returncode == 0 and os.path.getsize(out) > 0:
+            return out
     return None
 
 
