@@ -574,6 +574,9 @@ in
       serviceConfig.Type = "oneshot";
       script = ''
         api=http://127.0.0.1:${toString ports.qbittorrent}/api/v2
+        # qBittorrent restarting (a rebuild, an update) is not a failure of
+        # this job; the next minute's run picks up where this one would have.
+        curl -sf -m 5 "$api/app/version" >/dev/null || { echo "qBittorrent not answering; skipping this run"; exit 0; }
         from=${toString cfg.nightDownloads.from}
         until=${toString cfg.nightDownloads.until}
         h=$(date +%-H)
