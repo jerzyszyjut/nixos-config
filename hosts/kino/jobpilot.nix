@@ -29,11 +29,11 @@
     # the jobpilot bridge only.
     flaresolverr.url = "http://host.containers.internal:${toString config.services.flaresolverr.port}/v1";
 
-    # Off until HTTPS certificates are enabled for the tailnet (admin
-    # console → DNS). `tailscale serve --https` cannot start without them,
-    # and a unit that fails on every boot fails every rebuild with it.
-    # Also read 4.9 in the jobpilot deploy guide first: kino is shared with
-    # other tailnets, and noVNC (:6080) has no password of its own.
-    tailscaleServe = false;
+    # Publishes the UI on https://kino.<tailnet>.ts.net and noVNC on :6080,
+    # tailnet only. Needs HTTPS certificates enabled for the tailnet (admin
+    # console → DNS); enabled 2026-09-30. noVNC has no password of its own,
+    # and kino is shared with other tailnets — a known, accepted exposure;
+    # 4.9 in the jobpilot deploy guide has the ACL that closes it.
+    tailscaleServe = true;
   };
 }
