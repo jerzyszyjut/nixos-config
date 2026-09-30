@@ -255,6 +255,8 @@
             # Films and series download 00:00–08:00; Force start in
             # qBittorrent to get one right away.
             mediaServer.nightDownloads.enable = true;
+            # English on top, German underneath, as an extra subtitle track.
+            mediaServer.dualSubtitles.enable = true;
           };
         };
       };
