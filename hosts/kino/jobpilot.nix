@@ -19,15 +19,15 @@
     #   drops the images' HEALTHCHECK.
     # Once the project tags releases and the GHCR packages are public, this
     # becomes a plain version string and the build step goes away.
-    # 487192f is the head of the branch document-revisions (2026-10-01),
-    # built on flaresolverr-browser-fetch: documents can be regenerated with
-    # notes (with a progress bar), offers corrected on their own page and
-    # letters signed (signature under Settings). The earlier branch
+    # 017dc0c is the head of the branch englishjobsearch-source (2026-10-01):
+    # a collector for englishjobsearch.at, on top of document-revisions
+    # (documents regenerated with notes and a progress bar, offers corrected
+    # on their own page, letters signed – signature under Settings). The earlier branch
     # fetches browser-only hosts through FlareSolverr and reads job ids from
     # behind StepStone's and XING's tracking links. It also changes the NixOS
     # module (worker stop signal); that arrives with the flake input once
     # it is merged.
-    imageTag = "487192f";
+    imageTag = "017dc0c";
 
     # Secrets stay on the server, like the other services here: this
     # repository is public. Root-only file, created by hand; see
