@@ -293,6 +293,81 @@
     };
   };
 
+  # ---- health alerts --------------------------------------------------------
+  # A laptop running 24/7 in a dorm room: on 2026-10-01 someone pulled the
+  # charger and nothing noticed until the battery was at 66%. This checks
+  # once a minute and sends a Telegram message — through JobPilot's bot, whose
+  # token stays in its server-only env file — when the charger goes or comes
+  # back, the battery runs low, or the CPU or an SSD runs hot. Each condition
+  # alerts once when it starts and once when it clears, never on every run.
+  systemd.services.health-alert = {
+    description = "Telegram alerts for power loss and high temperatures";
+    serviceConfig.Type = "oneshot";
+    path = [ pkgs.curl pkgs.coreutils pkgs.gnugrep ];
+    script = ''
+      env=/var/lib/jobpilot/jobpilot.env
+      state=/run/health-alert
+      mkdir -p "$state"
+      token=$(grep -oP '^TELEGRAM_BOT_TOKEN=\K.*' "$env")
+      chat=$(grep -oP '^TELEGRAM_ALLOWED_CHAT_ID=\K.*' "$env")
+
+      send() {
+        echo "$1"
+        # The token goes in on stdin, not argv, so `ps` never shows it.
+        printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$token" |
+          curl -sf -m 15 -K - -d chat_id="$chat" --data-urlencode text="🖥 kino: $1" >/dev/null ||
+          echo "telegram send failed"
+      }
+      # flag NAME on|off MESSAGE-ON MESSAGE-OFF: alert on each change.
+      flag() {
+        if [ "$2" = on ] && [ ! -e "$state/$1" ]; then touch "$state/$1"; send "$3"
+        elif [ "$2" = off ] && [ -e "$state/$1" ]; then rm "$state/$1"; send "$4"
+        fi
+      }
+
+      [ -e "$state/booted" ] || { touch "$state/booted"; send "system uruchomiony (np. po zaniku zasilania)"; }
+
+      bat=$(cat /sys/class/power_supply/BAT0/capacity)
+      ac=$(cat /sys/class/power_supply/ADP0/online)
+      flag unplugged "$([ "$ac" = 0 ] && echo on || echo off)" \
+        "⚠️ ładowarka odłączona, bateria $bat% (wystarczy na ok. $((bat * 6 / 100)) h)" \
+        "✅ ładowarka znów podłączona, bateria $bat%"
+      flag battery-low "$([ "$ac" = 0 ] && [ "$bat" -le 25 ] && echo on || echo off)" \
+        "🪫 bateria tylko $bat%, za chwilę się wyłączę" \
+        "bateria już poza stanem krytycznym ($bat%)"
+
+      # Hot is 85 °C for the CPU and 70 °C for an SSD; it clears 10 °C lower
+      # so a reading hovering at the limit does not alert every minute. The
+      # CPU has to be hot on two runs in a row: a transcode can spike it.
+      cpu=0
+      for z in /sys/class/thermal/thermal_zone*; do
+        [ "$(cat $z/type)" = x86_pkg_temp ] && cpu=$(( $(cat $z/temp) / 1000 ))
+      done
+      if [ "$cpu" -ge 85 ]; then
+        [ -e "$state/cpu-warm" ] && flag cpu-hot on "🔥 procesor ma $cpu °C" "" || touch "$state/cpu-warm"
+      elif [ "$cpu" -lt 75 ]; then
+        rm -f "$state/cpu-warm"
+        flag cpu-hot off "" "procesor ostygł do $cpu °C"
+      fi
+      for h in /sys/class/hwmon/hwmon*; do
+        [ "$(cat $h/name)" = nvme ] || continue
+        t=$(( $(cat $h/temp1_input) / 1000 )) id=$(basename $h)
+        if [ "$t" -ge 70 ]; then flag ssd-hot-$id on "🔥 dysk SSD ma $t °C" ""
+        elif [ "$t" -lt 60 ]; then flag ssd-hot-$id off "" "dysk SSD ostygł do $t °C"
+        fi
+      done
+    '';
+  };
+
+  systemd.timers.health-alert = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "1min";
+      OnUnitActiveSec = "1min";
+      AccuracySec = "10s";
+    };
+  };
+
   # ---- getting back into it ----------------------------------------------
   # This box has no keyboard you will use. SSH is how you administer it, and
   # if this is wrong you are carrying a monitor to it.
