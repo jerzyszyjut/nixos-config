@@ -19,11 +19,12 @@
     #   drops the images' HEALTHCHECK.
     # Once the project tags releases and the GHCR packages are public, this
     # becomes a plain version string and the build step goes away.
-    # d2df889 is the head of the branch flaresolverr-browser-fetch
-    # (2026-09-30): browser-only hosts such as devjobs.at are fetched
-    # through FlareSolverr. The NixOS module is unchanged, so the flake input
-    # can stay on the older commit.
-    imageTag = "d2df889";
+    # 5a6957d is on the branch flaresolverr-browser-fetch (2026-10-01):
+    # browser-only hosts such as devjobs.at are fetched through FlareSolverr,
+    # and job ids are read from behind StepStone's and XING's click-tracking
+    # links in alert mails. The branch also changes the NixOS module (worker
+    # stop signal); that arrives with the flake input once it is merged.
+    imageTag = "5a6957d";
 
     # Secrets stay on the server, like the other services here: this
     # repository is public. Root-only file, created by hand; see
