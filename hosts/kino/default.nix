@@ -16,6 +16,7 @@
     #   nixos-generate-config --root /mnt   (then copy it here)
     ./hardware-configuration.nix
     ./jobpilot.nix
+    ./opportunity-radar.nix
   ];
 
   networking.hostName = "kino";

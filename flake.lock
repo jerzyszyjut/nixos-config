@@ -268,6 +268,21 @@
         "type": "github"
       }
     },
+    "opportunity-radar": {
+      "locked": {
+        "lastModified": 1791300706,
+        "narHash": "sha256-kMGHvs220rVb1IuYv9qXnUm1xBBsGYd/GKf/LQWztXU=",
+        "owner": "jerzyszyjut",
+        "repo": "opportunity-radar",
+        "rev": "dfcadf8f1ddd18d5a5eda766c3201a701358f4d1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jerzyszyjut",
+        "repo": "opportunity-radar",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "home-manager": "home-manager",
@@ -275,6 +290,7 @@
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-unstable": "nixpkgs-unstable",
+        "opportunity-radar": "opportunity-radar",
         "sops-nix": "sops-nix",
         "stylix": "stylix"
       }

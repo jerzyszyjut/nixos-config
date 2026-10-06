@@ -34,6 +34,11 @@
       url = "github:jerzyszyjut/jobpilot";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Opportunity radar, for its NixOS module only; imported by
+    # hosts/kino/opportunity-radar.nix. Private like JobPilot, fetched with
+    # the same token. It has no inputs of its own.
+    opportunity-radar.url = "github:jerzyszyjut/opportunity-radar";
   };
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, nixos-hardware, stylix, sops-nix, ... }:
