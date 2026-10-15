@@ -7,7 +7,9 @@
 #
 # The Tailscale auth key comes from the environment at build time
 # (DOM_TS_AUTHKEY, with --impure) and ends up only in this ISO and the local
-# store. Make it single-use and short-lived, and revoke it after the install.
+# store. It must be REUSABLE (every boot of the live stick logs in afresh,
+# and a test boot in a VM uses it too) and ephemeral; revoke it after the
+# install.
 
 let
   authKey = builtins.getEnv "DOM_TS_AUTHKEY";
@@ -48,22 +50,36 @@ in
     description = "Tell the person at the screen that the PC is reachable";
     wantedBy = [ "multi-user.target" ];
     after = [ "tailscaled.service" "getty@tty1.service" ];
-    path = [ pkgs.tailscale pkgs.coreutils ];
+    path = [ pkgs.tailscale pkgs.coreutils pkgs.systemd ];
+    # Opens /dev/tty1 itself rather than StandardOutput=tty: getty hangs up
+    # the terminal when it starts, after which a descriptor systemd opened
+    # earlier only returns EIO and the banner never appeared.
     serviceConfig = {
       Type = "simple";
-      StandardOutput = "tty";
-      TTYPath = "/dev/tty1";
+      Restart = "on-failure";
     };
     script = ''
-      until ip=$(tailscale ip -4 2>/dev/null) && [ -n "$ip" ]; do sleep 5; done
-      printf '\n\n'
-      printf '   ###########################################\n'
-      printf '   #                                         #\n'
-      printf '   #   GOTOWE - komputer jest połączony.     #\n'
-      printf '   #   Nie wyłączaj go.                      #\n'
-      printf '   #                                         #\n'
-      printf '   ###########################################\n'
-      printf '\n   (adres: %s)\n\n' "$ip"
+      # A rejected key (used up, expired) would otherwise leave the screen
+      # silent forever; say so once, in words that can be read out over the
+      # phone.
+      warned=
+      until ip=$(tailscale ip -4 2>/dev/null) && [ -n "$ip" ]; do
+        if [ -z "$warned" ] && systemctl is-failed -q tailscaled-autoconnect; then
+          printf '\n   BŁĄD: klucz sieci odrzucony - potrzebny nowy pendrive.\n\n' > /dev/tty1
+          warned=1
+        fi
+        sleep 5
+      done
+      {
+        printf '\n\n'
+        printf '   ###########################################\n'
+        printf '   #                                         #\n'
+        printf '   #   GOTOWE - komputer jest połączony.     #\n'
+        printf '   #   Nie wyłączaj go.                      #\n'
+        printf '   #                                         #\n'
+        printf '   ###########################################\n'
+        printf '\n   (adres: %s)\n\n' "$ip"
+      } > /dev/tty1
     '';
   };
 }
