@@ -26,6 +26,10 @@ keys:
   # have generated it is the same one that needs to decrypt with it.
   - &host_kino age10aetd0a545dh7dn2sj8253u2gxw4jzkkj4mcpl55sjh6ghwx0s5q29gl4z
 
+  # dom's key, made the same way as kino's and copied in by nixos-anywhere
+  # (docs/DOM-INSTALL.md).
+  - &host_dom age10gpfqs2q0s4rkvrnhy2vzvx80vq4xs2tmudqajfn3g0rm5mg59jq92kzkc
+
 creation_rules:
   - path_regex: secrets/[^/]+\.yaml$
     key_groups:
@@ -33,3 +37,4 @@ creation_rules:
           - *admin_jerzy
           - *host_thinkpad
           - *host_kino
+          - *host_dom

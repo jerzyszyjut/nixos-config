@@ -41,7 +41,7 @@ in
   services.getty.helpLine = lib.mkForce ''
 
     Instalator domowego kina. Nic tu nie wpisuj.
-    Gdy pojawi się napis GOTOWE, zadzwoń do Jurka.
+    Poczekaj na napis GOTOWE.
   '';
 
   systemd.services.dom-ready = {
@@ -60,7 +60,7 @@ in
       printf '   ###########################################\n'
       printf '   #                                         #\n'
       printf '   #   GOTOWE - komputer jest połączony.     #\n'
-      printf '   #   Zadzwoń do Jurka. Nie wyłączaj go.    #\n'
+      printf '   #   Nie wyłączaj go.                      #\n'
       printf '   #                                         #\n'
       printf '   ###########################################\n'
       printf '\n   (adres: %s)\n\n' "$ip"

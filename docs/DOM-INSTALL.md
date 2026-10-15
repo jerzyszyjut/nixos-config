@@ -3,9 +3,9 @@
 `dom` is an old desktop at the parents' in Poland. Nobody there installs
 anything: they boot a USB stick, the stick joins the tailnet by itself, and
 the install runs from the ThinkPad over SSH with
-[nixos-anywhere](https://github.com/nix-community/nixos-anywhere). Their
-side of it is a separate one-page guide (the Claude doc "Instalacja domowego
-kina – instrukcja dla Taty").
+[nixos-anywhere](https://github.com/nix-community/nixos-anywhere). The
+on-site side is a separate one-page guide (the Claude doc "Instalacja
+domowego kina"), done while on the phone.
 
 ## 1. Two Tailscale auth keys
 
@@ -42,17 +42,17 @@ Set `device` in `hosts/dom/disko.nix` to the disk to wipe.
 ## 4. Secrets
 
 dom decrypts sops secrets with its own age key, made here and copied in
-during the install (same as kino, see `.sops.yaml`):
+during the install (same as kino, see `.sops.yaml`). Everything that goes
+onto the disk besides the system lives OUTSIDE the repo, in
+`~/.local/share/dom-install/extra-files` (made 2026-10-15):
 
-```sh
-x=$(mktemp -d)
-install -d -m 755 $x/var/lib/sops-nix $x/var/lib/tailscale
-age-keygen -o $x/var/lib/sops-nix/key.txt   # prints the public key
-printf %s 'tskey-auth-…' > $x/var/lib/tailscale/authkey   # the "dom" key
-chmod 600 $x/var/lib/sops-nix/key.txt $x/var/lib/tailscale/authkey
-```
+| File | What |
+| --- | --- |
+| `var/lib/sops-nix/key.txt` | dom's age key; its public half is `host_dom` in `.sops.yaml` |
+| `var/lib/tailscale/authkey` | the one-off "dom" Tailscale key |
+| `var/lib/mullvad/private.key` | dom's WireGuard key for Mullvad |
 
-Add the public key to `.sops.yaml` as `host_dom`, then
+To start over: `age-keygen -o …/key.txt`, replace `host_dom`, then
 `sops updatekeys secrets/secrets.yaml`.
 
 ## 5. Install
@@ -62,7 +62,7 @@ git add -A   # flakes only see tracked files
 nix run github:nix-community/nixos-anywhere -- \
   --flake .#dom \
   --generate-hardware-config nixos-generate-config hosts/dom/hardware-configuration.nix \
-  --extra-files $x \
+  --extra-files ~/.local/share/dom-install/extra-files \
   root@dom-installer
 ```
 
@@ -73,9 +73,9 @@ them the stick can come out.
 
 ## 6. After the install
 
-- Mullvad: a new device for dom in the Mullvad account, its private key at
-  `/var/lib/mullvad/private.key` (mode 600), address / public key / endpoint
-  in `flake.nix`, then `mediaServer.autostart = true`. Until then the stack
+- Mullvad: the key is already on the disk (above); register its public half
+  as a device in the Mullvad account, put the address / server public key /
+  endpoint in `flake.nix`, then `mediaServer.autostart = true`. Until then the stack
   stays off, so nothing downloads from the parents' own IP.
 - Wire the services together: `docs/MEDIA.md`.
 - Jellyfin accounts for the parents; the TV app finds the server on the LAN.
