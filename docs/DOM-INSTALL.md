@@ -50,7 +50,7 @@ onto the disk besides the system lives OUTSIDE the repo, in
 | --- | --- |
 | `var/lib/sops-nix/key.txt` | dom's age key; its public half is `host_dom` in `.sops.yaml` |
 | `var/lib/tailscale/authkey` | the one-off "dom" Tailscale key |
-| `var/lib/mullvad/private.key` | dom's WireGuard key for Mullvad |
+| `var/lib/mullvad/private.key` | dom's WireGuard key for Mullvad (from the site's config zip) |
 
 To start over: `age-keygen -o …/key.txt`, replace `host_dom`, then
 `sops updatekeys secrets/secrets.yaml`.
@@ -73,10 +73,8 @@ them the stick can come out.
 
 ## 6. After the install
 
-- Mullvad: the key is already on the disk (above); register its public half
-  as a device in the Mullvad account, put the address / server public key /
-  endpoint in `flake.nix`, then `mediaServer.autostart = true`. Until then the stack
-  stays off, so nothing downloads from the parents' own IP.
+- Mullvad is configured: device made on mullvad.net (2026-10-15), its key in
+  extra-files, address and server in `flake.nix`.
 - Wire the services together: `docs/MEDIA.md`.
 - Jellyfin accounts for the parents; the TV app finds the server on the LAN.
 - Hardware: an Intel iGPU gets `nixos-hardware.nixosModules.common-cpu-intel`

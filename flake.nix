@@ -296,15 +296,14 @@
             # Wired, and named eth0 (hosts/dom turns off predictable names), so
             # the TV in the living room finds Jellyfin by itself.
             mediaServer.lanInterfaces = [ "eth0" ];
-            # Off until Mullvad is set up below: without the tunnel qBittorrent
-            # would download from the parents' own IP address.
-            # TODO(dom): a Mullvad device for dom, its key at
-            # /var/lib/mullvad/private.key, these three values, then autostart.
-            mediaServer.autostart = false;
-            # mediaServer.vpn.enable = true;
-            # mediaServer.vpn.address = "";
-            # mediaServer.vpn.peer.publicKey = "";
-            # mediaServer.vpn.peer.endpoint = "";
+            mediaServer.autostart = true;
+            # qBittorrent through Mullvad, as on kino: its own device (the key
+            # is copied in at install, docs/DOM-INSTALL.md), Zurich
+            # ch-zrh-wg-002 — the server next to kino's.
+            mediaServer.vpn.enable = true;
+            mediaServer.vpn.address = "10.71.220.144/32";
+            mediaServer.vpn.peer.publicKey = "cq9ktmbTZwxYCrCSxV8SItOjRhJhLoYYkPThlifkkVI=";
+            mediaServer.vpn.peer.endpoint = "193.32.127.70:51820";
             # Downloads at night, so they never slow down the parents' internet.
             mediaServer.nightDownloads.enable = true;
           };
