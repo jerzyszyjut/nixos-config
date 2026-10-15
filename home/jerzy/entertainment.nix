@@ -45,6 +45,10 @@ lib.mkIf cfg.enable {
     mpv
     vlc
 
+    # Paste a link, pick a resolution or mp3, file lands in ~/Downloads.
+    # Packaged in pkgs/yoinks with yt-dlp and ffmpeg from nixpkgs.
+    (callPackage ../../pkgs/yoinks { })
+
     # ---- music -------------------------------------------------------------
     spotify
 
