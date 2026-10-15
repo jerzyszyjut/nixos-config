@@ -23,6 +23,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Declarative partitioning, so a machine can be installed remotely in one
+    # command (nixos-anywhere). Only `dom` uses it; see docs/DOM-INSTALL.md.
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # JobPilot (job search copilot), for its NixOS module only; imported by
     # hosts/kino/jobpilot.nix and by nothing else. The repository is
     # PRIVATE: fetching it needs a GitHub token, which on kino lives in
@@ -275,6 +282,43 @@
             # English on top, German underneath, as an extra subtitle track.
             mediaServer.dualSubtitles.enable = true;
           };
+        };
+
+        # ---- the parents' home cinema ----------------------------------------
+        # An old desktop in Poland: kino's film and series stack without the
+        # music and books, installed remotely — docs/DOM-INSTALL.md.
+        dom = mkHost {
+          hostModule = ./hosts/dom;
+          profiles = {
+            mediaServer.enable = true;
+            mediaServer.music.enable = false;
+            mediaServer.books.enable = false;
+            # Wired, and named eth0 (hosts/dom turns off predictable names), so
+            # the TV in the living room finds Jellyfin by itself.
+            mediaServer.lanInterfaces = [ "eth0" ];
+            # Off until Mullvad is set up below: without the tunnel qBittorrent
+            # would download from the parents' own IP address.
+            # TODO(dom): a Mullvad device for dom, its key at
+            # /var/lib/mullvad/private.key, these three values, then autostart.
+            mediaServer.autostart = false;
+            # mediaServer.vpn.enable = true;
+            # mediaServer.vpn.address = "";
+            # mediaServer.vpn.peer.publicKey = "";
+            # mediaServer.vpn.peer.endpoint = "";
+            # Downloads at night, so they never slow down the parents' internet.
+            mediaServer.nightDownloads.enable = true;
+          };
+        };
+
+        # The USB stick the parents boot the old PC from: a NixOS installer that
+        # joins the tailnet by itself, so the install happens over SSH from
+        # here. Built with the Tailscale auth key from the environment, never
+        # from the repo:
+        #   DOM_TS_AUTHKEY=tskey-auth-… nix build --impure \
+        #     .#nixosConfigurations.dom-installer.config.system.build.isoImage
+        dom-installer = nixpkgs.lib.nixosSystem {
+          inherit system;
+          modules = [ ./hosts/dom-installer ];
         };
       };
 
