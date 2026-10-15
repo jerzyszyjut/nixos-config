@@ -79,8 +79,13 @@
       # every time the adapter has to wake up for the next movement.
       USB_EXCLUDE_BTUSB = 1;
 
-      START_CHARGE_THRESH_BAT0 = 40; # Starts charging when below 40%
-      STOP_CHARGE_THRESH_BAT0 = 80;  # Stops charging when reaching 80
+      # Plugged in ~80% of the time, but it has to leave the house (uni)
+      # nearly full. At the stop threshold the firmware stops charging and
+      # runs on AC alone; the 10-point gap keeps it from topping up every
+      # few minutes. For a true 100% before a long day: `sudo tlp fullcharge`
+      # (one-off; these thresholds come back on the next boot).
+      START_CHARGE_THRESH_BAT0 = 85; # Starts charging when below 85%
+      STOP_CHARGE_THRESH_BAT0 = 95;  # Stops charging when reaching 95%
     };
   };
   # tlp and power-profiles-daemon fight each other. Only one.
