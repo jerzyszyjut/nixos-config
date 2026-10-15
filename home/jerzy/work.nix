@@ -33,6 +33,11 @@ lib.mkIf osConfig.profiles.work.enable {
     yarn
     cookiecutter
     postgresql # psql client + the libpq headers you had via libpq-dev
+    # TU Wien Low-Level Programming / Efficient Programs, offline copies of
+    # what g0.complang.tuwien.ac.at has. rustup rather than rustc so the
+    # toolchain can be pinned to g0's (`rustup default <version>`).
+    gforth
+    rustup
 
     # ---- language servers for nvim -----------------------------------------
     # These replace everything mason would otherwise download. Adding a server

@@ -86,7 +86,15 @@
   environment.systemPackages = with pkgs; [
     wireguard-tools
     openvpn
-    openconnect # in case anything uses Cisco AnyConnect
+    openconnect # Cisco AnyConnect: TU Wien, see tuvpn below
+    # TU Wien VPN in the foreground; Ctrl-C disconnects. 1_TU_getunnelt is
+    # the split tunnel (only TU networks go through it) and the group TU asks
+    # people to use; 2_Alles_getunnelt only for library e-journals. Username
+    # (UserID@student.tuwien.ac.at), password and MFA code are prompted for.
+    (writeShellScriptBin "tuvpn" ''
+      exec sudo ${openconnect}/bin/openconnect --protocol=anyconnect \
+        --authgroup=1_TU_getunnelt "$@" vpn.tuwien.ac.at
+    '')
     mtr
     dig
     ethtool

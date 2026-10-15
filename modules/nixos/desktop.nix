@@ -231,6 +231,11 @@ in
     networkmanagerapplet
   ];
 
+  # Cisco AnyConnect (TU Wien VPN) from the applet / nm-connection-editor.
+  # Here rather than net.nix: its login dialog pulls in GTK and webkitgtk,
+  # which the headless server has no use for. `tuvpn` (net.nix) is the CLI.
+  networking.networkmanager.plugins = [ pkgs.networkmanager-openconnect ];
+
   services.gvfs.enable = true;
   services.udisks2.enable = true;
   programs.dconf.enable = true;
