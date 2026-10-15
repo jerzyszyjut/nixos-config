@@ -114,6 +114,8 @@ in
       # kitty's ssh kitten: ships terminfo to the remote host automatically,
       # so nothing on the remote hosts needs configuring.
       s = "kitten ssh";
+      # Push Obsidian notes marked `publish: true` to jerzyszyjut.github.io/notes.
+      pn = "~/Obsidian/quartz/publish.sh";
     };
   };
 
