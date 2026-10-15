@@ -11,14 +11,19 @@ domowego kina"), done while on the phone.
 
 In the admin console (Settings → Keys → Generate auth key):
 
-| Key | Reusable | Ephemeral | Expiry | Goes into |
-| --- | --- | --- | --- | --- |
-| installer | yes | yes | 30 days | the ISO |
-| dom | no | no | 7 days | `/var/lib/tailscale/authkey` on the installed disk |
+| Key | Reusable | Ephemeral | Goes into |
+| --- | --- | --- | --- |
+| installer | yes | ideally | the ISO |
+| dom | yes | no | `/var/lib/tailscale/authkey` on the installed disk |
 
-The installer key is reusable because the live USB keeps no state: every boot
-of the stick logs in again. Ephemeral removes `dom-installer` from the
-tailnet once it goes offline. Revoke both after the install.
+Both must be reusable: the live USB keeps no state, so every boot of the
+stick (and any test boot in a VM) logs in afresh, and a single-use key dies
+on the first one. As built on 2026-10-15 both use the same reusable,
+non-ephemeral key, so `dom-installer` nodes stay in the tailnet after the
+install: remove them in the admin console and revoke the key.
+
+A leftover `dom-installer` makes the next one `dom-installer-1`, so connect
+to the address printed under GOTOWE (`ssh root@100.x.y.z`), not the name.
 
 ## 2. Build the stick and send it
 
@@ -33,8 +38,8 @@ Share the ISO privately (Google Drive link, not public: it holds the key).
 ## 3. When `dom-installer` shows up
 
 ```sh
-ssh root@dom-installer lsblk -o NAME,SIZE,MODEL,TRAN
-ssh root@dom-installer 'lspci | grep -iE "vga|ethernet"; [ -d /sys/firmware/efi ] && echo UEFI || echo BIOS'
+ssh root@<address> lsblk -o NAME,SIZE,MODEL,TRAN
+ssh root@<address> 'lspci | grep -iE "vga|ethernet"; [ -d /sys/firmware/efi ] && echo UEFI || echo BIOS'
 ```
 
 Set `device` in `hosts/dom/disko.nix` to the disk to wipe.
@@ -63,7 +68,7 @@ nix run github:nix-community/nixos-anywhere -- \
   --flake .#dom \
   --generate-hardware-config nixos-generate-config hosts/dom/hardware-configuration.nix \
   --extra-files ~/.local/share/dom-install/extra-files \
-  root@dom-installer
+  root@<address>
 ```
 
 It wipes the disk, installs, writes the real `hardware-configuration.nix`
