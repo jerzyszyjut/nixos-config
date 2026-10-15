@@ -250,6 +250,29 @@ in
       };
     };
 
+    # Films and series are the core and always on; music and books are
+    # extras a second machine (dom, at the parents') does without.
+    music.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Lidarr, slskd, Soularr and Navidrome.";
+    };
+
+    books.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Calibre-Web-Automated and the book downloader.";
+    };
+
+    lanInterfaces = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "wlan0" ];
+      description = ''
+        Interfaces on which Jellyfin is open to the local network, for smart
+        TVs that cannot join the tailnet. Everything else stays tailnet-only.
+      '';
+    };
+
     autostart = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -299,8 +322,16 @@ in
       "${mediaRoot}/library".d = { user = "radarr"; group = "media"; mode = "2775"; };
       "${moviesDir}".d = { user = "radarr"; group = "media"; mode = "2775"; };
       "${tvDir}".d = { user = "sonarr"; group = "media"; mode = "2775"; };
+      "${dvrDir}".d = { user = "jellyfin"; group = "media"; mode = "2775"; };
+    } // lib.optionalAttrs cfg.music.enable {
       "${musicDir}".d = { user = "lidarr"; group = "media"; mode = "2775"; };
 
+      # Soulseek downloads. Owned by slskd, group media so Lidarr can import
+      # out of here and jerzy can clean up without sudo.
+      "${soulseekDir}".d = { user = "slskd"; group = "media"; mode = "2775"; };
+      "${soulseekDir}/complete".d = { user = "slskd"; group = "media"; mode = "2775"; };
+      "${soulseekDir}/incomplete".d = { user = "slskd"; group = "media"; mode = "2775"; };
+    } // lib.optionalAttrs cfg.books.enable {
       # Owned by the CWA container's user, which is created below purely so
       # these two directories have a non-root owner that the container can
       # map onto. Both are setgid into `media` like everything else, so
@@ -308,14 +339,6 @@ in
       "${booksDir}".d = { user = "cwa"; group = "media"; mode = "2775"; };
       "${mediaRoot}/ingest".d = { user = "cwa"; group = "media"; mode = "2775"; };
       "${bookIngestDir}".d = { user = "cwa"; group = "media"; mode = "2775"; };
-
-      "${dvrDir}".d = { user = "jellyfin"; group = "media"; mode = "2775"; };
-
-      # Soulseek downloads. Owned by slskd, group media so Lidarr can import
-      # out of here and jerzy can clean up without sudo.
-      "${soulseekDir}".d = { user = "slskd"; group = "media"; mode = "2775"; };
-      "${soulseekDir}/complete".d = { user = "slskd"; group = "media"; mode = "2775"; };
-      "${soulseekDir}/incomplete".d = { user = "slskd"; group = "media"; mode = "2775"; };
     };
 
     # State for the two containers, kept OUT of ${mediaRoot} on purpose: this
@@ -328,8 +351,17 @@ in
     # perfectly well, and inventing a NixOS user just to own two directories
     # would be ceremony.
     systemd.tmpfiles.settings."11-media-containers" = {
+      "/var/lib/threadfin".d = { user = "31337"; group = "31337"; mode = "0755"; };
+      "/var/lib/threadfin/conf".d = { user = "31337"; group = "31337"; mode = "0755"; };
+      "/var/lib/threadfin/tmp".d = { user = "31337"; group = "31337"; mode = "0755"; };
+    } // lib.optionalAttrs cfg.books.enable {
       "/var/lib/cwa".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
       "/var/lib/cwa/config".d = { user = "cwa"; group = "cwa"; mode = "0750"; };
+      # Shelfmark's settings. Owned by cwa:media because the container runs
+      # as those ids — the same PUID/PGID pair /run/cwa.env hands to CWA.
+      "/var/lib/shelfmark".d = { user = "cwa"; group = "media"; mode = "0750"; };
+      "/var/lib/shelfmark/config".d = { user = "cwa"; group = "media"; mode = "0750"; };
+    } // lib.optionalAttrs cfg.music.enable {
       # Created empty so slskd can start before you have put credentials in
       # it.
       #
@@ -340,18 +372,9 @@ in
       # the directory never appears, and the unit then dies on a missing
       # EnvironmentFile five times until systemd gives up. The visible
       # symptom is a crash loop; the cause is one wrong word here.
-      # Shelfmark's settings. Owned by cwa:media because the container runs
-      # as those ids — the same PUID/PGID pair /run/cwa.env hands to CWA.
-      "/var/lib/shelfmark".d = { user = "cwa"; group = "media"; mode = "0750"; };
-      "/var/lib/shelfmark/config".d = { user = "cwa"; group = "media"; mode = "0750"; };
-
       "/var/lib/soularr".d = { user = "root"; group = "root"; mode = "0700"; };
       "/var/lib/slskd".d = { user = "slskd"; group = "media"; mode = "0750"; };
       "/var/lib/slskd/slskd.env".f = { user = "slskd"; group = "media"; mode = "0600"; };
-
-      "/var/lib/threadfin".d = { user = "31337"; group = "31337"; mode = "0755"; };
-      "/var/lib/threadfin/conf".d = { user = "31337"; group = "31337"; mode = "0755"; };
-      "/var/lib/threadfin/tmp".d = { user = "31337"; group = "31337"; mode = "0755"; };
     };
 
     # btrfs is copy-on-write, and a torrent client writing 4 MiB pieces into
@@ -888,7 +911,7 @@ in
     # Lidarr is a good way to follow artists you care about and a poor way to
     # acquire a back catalogue in bulk.
     services.lidarr = {
-      enable = true;
+      enable = cfg.music.enable;
       group = "media";
       settings.server = {
         port = ports.lidarr;
@@ -897,7 +920,13 @@ in
     };
 
     # Same hardlink-import reason as Radarr and Sonarr.
-    systemd.services.lidarr.serviceConfig.UMask = lib.mkForce "0002";
+    # It joins media.target here rather than in the list at the end: one
+    # definition per unit, so the whole unit can sit under the mkIf.
+    systemd.services.lidarr = lib.mkIf cfg.music.enable {
+      serviceConfig.UMask = lib.mkForce "0002";
+      wantedBy = lib.mkForce [ "media.target" ];
+      partOf = [ "media.target" ];
+    };
 
     # ---- slskd (Soulseek) ------------------------------------------------
     # The music equivalent of the book downloader below, and the answer to
@@ -909,7 +938,7 @@ in
     # slskd is the headless daemon with a web UI. It downloads into
     # ${soulseekDir}, and Lidarr can import from there into ${musicDir}.
     services.slskd = {
-      enable = true;
+      enable = cfg.music.enable;
       group = "media";
 
       # Reachable over Tailscale like the other things you actually open.
@@ -969,15 +998,18 @@ in
     # slskd writes into the library-adjacent tree that Lidarr then imports
     # from, so it needs the same group-writable umask as qBittorrent for the
     # hardlink to be permitted. Same fs.protected_hardlinks reasoning.
-    systemd.services.slskd.serviceConfig.UMask = lib.mkForce "0002";
 
     # Belt and braces after the above: the leading "-" makes systemd treat a
     # missing environment file as empty rather than as a fatal error. A
     # server that has not been given Soulseek credentials yet should start
     # and sit there unable to log in, not refuse to start and take five
     # restarts to say so.
-    systemd.services.slskd.serviceConfig.EnvironmentFile =
-      lib.mkForce "-/var/lib/slskd/slskd.env";
+    systemd.services.slskd = lib.mkIf cfg.music.enable {
+      serviceConfig.UMask = lib.mkForce "0002";
+      serviceConfig.EnvironmentFile = lib.mkForce "-/var/lib/slskd/slskd.env";
+      wantedBy = lib.mkForce [ "media.target" ];
+      partOf = [ "media.target" ];
+    };
 
     # ---- Navidrome -------------------------------------------------------
     # The music server, and the answer to "how do I listen to this on my
@@ -993,7 +1025,7 @@ in
     # its mobile story are both markedly worse, and pointing two scanners at
     # one tree doubles the I/O for no gain.
     services.navidrome = {
-      enable = true;
+      enable = cfg.music.enable;
       group = "media";
 
       # Unlike the *arr admin UIs this is NOT loopback-bound. The phone has
@@ -1190,13 +1222,13 @@ in
     # process as PUID:PGID and chown what they touch, and pointing that at
     # root or at a real user is how a library ends up unreadable by anything
     # else.
-    users.users.cwa = {
+    users.users.cwa = lib.mkIf cfg.books.enable {
       isSystemUser = true;
       group = "cwa";
       extraGroups = [ "media" ];
       description = "Calibre-Web-Automated container owner";
     };
-    users.groups.cwa = { };
+    users.groups.cwa = lib.mkIf cfg.books.enable { };
 
     # PUID/PGID have to be NUMBERS, and neither number is known at build
     # time: NixOS allocates the cwa uid and the media gid at activation. So
@@ -1204,7 +1236,7 @@ in
     # reads, rather than hardcoded — hardcoding them is the bug where the
     # library works until the day a uid shifts and every file belongs to
     # nobody.
-    systemd.services.cwa-env = {
+    systemd.services.cwa-env = lib.mkIf cfg.books.enable {
       description = "Resolve uid/gid for the Calibre-Web-Automated container";
       wantedBy = [ "media.target" ];
       before = [ "podman-cwa.service" "podman-book-downloader.service" ];
@@ -1242,7 +1274,7 @@ in
       };
     };
 
-    virtualisation.oci-containers.containers.cwa = {
+    virtualisation.oci-containers.containers.cwa = lib.mkIf cfg.books.enable {
       # Pinned by DIGEST, not by :latest. A tag is a moving target, and
       # `podman pull` on a restart would silently swap the running version —
       # which for a program that rewrites your book metadata in place is not
@@ -1279,7 +1311,7 @@ in
     #
     # It searches shadow libraries — Anna's Archive and Library Genesis.
     # That is what it is for and it is worth knowing rather than finding out.
-    virtualisation.oci-containers.containers.book-downloader = {
+    virtualisation.oci-containers.containers.book-downloader = lib.mkIf cfg.books.enable {
       # Digest-pinned for the same reason as the other two.
       image = "ghcr.io/calibrain/calibre-web-automated-book-downloader@sha256:9602290324993c801b319d3166b202b96bd9039af2416f0916dae03a5bdca815";
 
@@ -1344,7 +1376,7 @@ in
     #
     # Its config.ini carries Lidarr's API key and lives only on the server
     # at /var/lib/soularr/config.ini — never in this repository.
-    virtualisation.oci-containers.containers.soularr = {
+    virtualisation.oci-containers.containers.soularr = lib.mkIf cfg.music.enable {
       image = "ghcr.io/mrusse/soularr@sha256:c4f97924fabfce4e0de539d821ea7d20519b95c4815a707bacfc9d7212597f20";
       volumes = [
         "/var/lib/soularr:/data"
@@ -1461,22 +1493,15 @@ in
             }
           ];
         }
-        {
-          "Słuchanie i czytanie" = [
+      ] ++ lib.optional (cfg.music.enable || cfg.books.enable) {
+          "Słuchanie i czytanie" =
+            lib.optionals cfg.music.enable [
             {
               "Navidrome" = {
                 href = "http://${config.networking.hostName}:${toString ports.navidrome}";
                 siteMonitor = "http://localhost:${toString ports.navidrome}";
                 description = "Muzyka — serwer Subsonic dla telefonu";
                 icon = "navidrome.png";
-              };
-            }
-            {
-              "Book Downloader" = {
-                href = "http://${config.networking.hostName}:${toString ports.bookDownloader}";
-                siteMonitor = "http://localhost:${toString ports.bookDownloader}";
-                description = "Szukanie e-booków → ingest";
-                icon = "calibre-web.png";
               };
             }
             {
@@ -1487,6 +1512,16 @@ in
                 icon = "soulseek.png";
               };
             }
+            ]
+            ++ lib.optionals cfg.books.enable [
+            {
+              "Book Downloader" = {
+                href = "http://${config.networking.hostName}:${toString ports.bookDownloader}";
+                siteMonitor = "http://localhost:${toString ports.bookDownloader}";
+                description = "Szukanie e-booków → ingest";
+                icon = "calibre-web.png";
+              };
+            }
             {
               "Calibre-Web" = {
                 href = "http://${config.networking.hostName}:${toString ports.cwa}";
@@ -1495,8 +1530,9 @@ in
                 icon = "calibre-web.png";
               };
             }
-          ];
+            ];
         }
+      ++ [
         {
           "Kuchnia" = [
             {
@@ -1513,22 +1549,6 @@ in
                 siteMonitor = "http://localhost:${toString ports.sonarr}";
                 description = "Seriale: kolejka i import";
                 icon = "sonarr.png";
-              };
-            }
-            {
-              "Soularr" = {
-                href = "http://${config.networking.hostName}:${toString ports.soularr}";
-                siteMonitor = "http://localhost:${toString ports.soularr}";
-                description = "Lidarr → Soulseek, automatycznie";
-                icon = "soulseek.png";
-              };
-            }
-            {
-              "Lidarr" = {
-                href = "http://${config.networking.hostName}:${toString ports.lidarr}";
-                siteMonitor = "http://localhost:${toString ports.lidarr}";
-                description = "Muzyka: kolejka i import";
-                icon = "lidarr.png";
               };
             }
             {
@@ -1572,6 +1592,23 @@ in
                 siteMonitor = "http://localhost:${toString ports.flaresolverr}";
                 description = "Obejście Cloudflare — nic tu nie klikasz";
                 icon = "flaresolverr.png";
+              };
+            }
+          ] ++ lib.optionals cfg.music.enable [
+            {
+              "Soularr" = {
+                href = "http://${config.networking.hostName}:${toString ports.soularr}";
+                siteMonitor = "http://localhost:${toString ports.soularr}";
+                description = "Lidarr → Soulseek, automatycznie";
+                icon = "soulseek.png";
+              };
+            }
+            {
+              "Lidarr" = {
+                href = "http://${config.networking.hostName}:${toString ports.lidarr}";
+                siteMonitor = "http://localhost:${toString ports.lidarr}";
+                description = "Muzyka: kolejka i import";
+                icon = "lidarr.png";
               };
             }
           ];
@@ -1636,15 +1673,13 @@ in
     systemd.services.qbittorrent = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.flaresolverr = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
     systemd.services.homepage-dashboard = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
-    systemd.services.lidarr = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
-    systemd.services.navidrome = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.navidrome = lib.mkIf cfg.music.enable { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
 
     # The oci-containers module names its units podman-<container>. They join
     # the target like everything else, so `media-down` still stops the whole
     # stack in one command — a container left running after media-down would
     # keep a lock on the library and be exactly the kind of surprise this
     # target exists to prevent.
-    systemd.services.podman-cwa = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
 
     # CWA's init chowns the ingest folder on every container start, and the
     # folder comes out of it as 0755 — owner-only write. tmpfiles sets 2775
@@ -1659,17 +1694,20 @@ in
     # time to run, put the mode back. "+" runs it as root; the sleep is the
     # window for cwa-init, which starts after podman reports the container
     # ready rather than before.
-    systemd.services.podman-cwa.serviceConfig.ExecStartPost = [
-      "+${pkgs.writeShellScript "cwa-ingest-perms" ''
-        sleep 30
-        ${pkgs.coreutils}/bin/chgrp media ${bookIngestDir}
-        ${pkgs.coreutils}/bin/chmod 2775 ${bookIngestDir}
-      ''}"
-    ];
+    systemd.services.podman-cwa = lib.mkIf cfg.books.enable {
+      wantedBy = lib.mkForce [ "media.target" ];
+      partOf = [ "media.target" ];
+      serviceConfig.ExecStartPost = [
+        "+${pkgs.writeShellScript "cwa-ingest-perms" ''
+          sleep 30
+          ${pkgs.coreutils}/bin/chgrp media ${bookIngestDir}
+          ${pkgs.coreutils}/bin/chmod 2775 ${bookIngestDir}
+        ''}"
+      ];
+    };
     systemd.services.podman-threadfin = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
-    systemd.services.podman-soularr = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; after = [ "lidarr.service" "slskd.service" ]; };
-    systemd.services.podman-book-downloader = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
-    systemd.services.slskd = { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
+    systemd.services.podman-soularr = lib.mkIf cfg.music.enable { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; after = [ "lidarr.service" "slskd.service" ]; };
+    systemd.services.podman-book-downloader = lib.mkIf cfg.books.enable { wantedBy = lib.mkForce [ "media.target" ]; partOf = [ "media.target" ]; };
 
     # ---- firewall --------------------------------------------------------
     # Only the BitTorrent peer port. Everything else is either loopback-bound
@@ -1686,7 +1724,7 @@ in
       # without it you can still connect outwards, you are just harder for
       # other peers to reach, which on Soulseek shows up as queues that
       # never start.
-      allowedTCPPorts = [ ports.torrenting ports.slskdListen ];
+      allowedTCPPorts = [ ports.torrenting ] ++ lib.optional cfg.music.enable ports.slskdListen;
       allowedUDPPorts = [ ports.torrenting ]; # DHT and µTP
 
       # ---- Jellyfin on the LAN ------------------------------------------
@@ -1695,7 +1733,7 @@ in
       # already listens on all interfaces, so this is purely the firewall
       # letting the living room in.
       #
-      # Only Jellyfin, and only on the wireless interface. Everything else —
+      # Only Jellyfin, and only on lanInterfaces (kino's wifi). Everything else —
       # the *arr admin UIs, qBittorrent, Seerr, Navidrome — stays invisible
       # from the LAN, so a guest on the wifi sees a login page and nothing
       # else. Jellyfin has its own accounts; this is not an open door.
@@ -1704,30 +1742,36 @@ in
       # Jellyfin's client auto-discovery, which is what lets the app find
       # the server by itself instead of you typing an address into a TV
       # remote — worth having for exactly that reason.
-      interfaces."wlan0" = {
-        allowedTCPPorts = [ ports.jellyfin ];
-        allowedUDPPorts = [ 7359 ];
-      };
+      interfaces = lib.mkMerge [
+        (lib.genAttrs cfg.lanInterfaces (_: {
+          allowedTCPPorts = [ ports.jellyfin ];
+          allowedUDPPorts = [ 7359 ];
+        }))
 
-      # Containers talking back to host services.
-      #
-      # podman0 is NOT added to trustedInterfaces, deliberately: that would
-      # let every container reach every port on this machine. Only the ports
-      # a container actually needs are opened, and only on this interface —
-      # the LAN and the internet still see nothing.
-      #
-      # Prowlarr is here because Shelfmark can use it as a book indexer
-      # source, which is the one genuinely useful thing it does beyond
-      # shadow libraries: the same indexers that already serve films and
-      # music, searched for books.
-      # FlareSolverr joins it for the same container: Anna's Archive sits
-      # behind Cloudflare, and without a solver Shelfmark gets the challenge
-      # page back instead of the book.
-      # qBittorrent, so a book Shelfmark finds through Prowlarr can actually
-      # be downloaded: Shelfmark hands the torrent to qBittorrent (category
-      # "books") and picks the file up from downloadDir when it completes.
-      # This path authenticates — LocalHostAuth only waives it for 127.0.0.1.
-      interfaces."podman0".allowedTCPPorts = [ ports.prowlarr ports.flaresolverr ports.qbittorrent ];
+        # Containers talking back to host services.
+        #
+        # podman0 is NOT added to trustedInterfaces, deliberately: that would
+        # let every container reach every port on this machine. Only the ports
+        # a container actually needs are opened, and only on this interface —
+        # the LAN and the internet still see nothing.
+        #
+        # Prowlarr is here because Shelfmark can use it as a book indexer
+        # source, which is the one genuinely useful thing it does beyond
+        # shadow libraries: the same indexers that already serve films and
+        # music, searched for books.
+        # FlareSolverr joins it for the same container: Anna's Archive sits
+        # behind Cloudflare, and without a solver Shelfmark gets the challenge
+        # page back instead of the book.
+        # qBittorrent, so a book Shelfmark finds through Prowlarr can actually
+        # be downloaded: Shelfmark hands the torrent to qBittorrent (category
+        # "books") and picks the file up from downloadDir when it completes.
+        # This path authenticates — LocalHostAuth only waives it for 127.0.0.1.
+        {
+          podman0 = lib.mkIf cfg.books.enable {
+            allowedTCPPorts = [ ports.prowlarr ports.flaresolverr ports.qbittorrent ];
+          };
+        }
+      ];
     };
 
     # ---- optional extras -------------------------------------------------
