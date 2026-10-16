@@ -236,6 +236,10 @@ in
   # which the headless server has no use for. `tuvpn` (net.nix) is the CLI.
   networking.networkmanager.plugins = [ pkgs.networkmanager-openconnect ];
 
+  # Shared clipboard, files and notifications with the phone (a Pixel).
+  # Opens 1714-1764 tcp/udp; the daemon starts from hyprland.conf.
+  programs.kdeconnect.enable = true;
+
   services.gvfs.enable = true;
   services.udisks2.enable = true;
   programs.dconf.enable = true;
