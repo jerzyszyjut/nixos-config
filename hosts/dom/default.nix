@@ -35,6 +35,11 @@
 
   zramSwap.enable = true;
 
+  # Seerr on the home network too, so the parents can request films from the
+  # browser at http://<dom's LAN address>:5055 (Jellyfin is opened there by
+  # mediaServer.lanInterfaces). Their own LAN, unlike kino's dorm WiFi.
+  networking.firewall.interfaces.eth0.allowedTCPPorts = [ 5055 ];
+
   # ---- GPU: RTX 2060 Super (Turing) ---------------------------------------
   # The Ryzen 5 3600 has no iGPU, so Jellyfin transcodes on NVENC instead of
   # kino's QuickSync. The open kernel module supports Turing and up.
