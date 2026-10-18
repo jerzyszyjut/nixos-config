@@ -9,9 +9,9 @@
 {
   disko.devices.disk.main = {
     type = "disk";
-    # TODO(dom): check with `lsblk` on the installer before installing; an
-    # NVMe disk is /dev/nvme0n1.
-    device = "/dev/sda";
+    # The 1 TB ADATA SX8200 NVMe (seen with lsblk on the installer, 2026-10-18).
+    # Not /dev/sda: that was the USB stick.
+    device = "/dev/nvme0n1";
     content = {
       type = "gpt";
       partitions = {
