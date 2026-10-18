@@ -7,7 +7,10 @@
   imports = [ inputs.jobpilot.nixosModules.default ];
 
   services.jobpilot = {
-    enable = true;
+    # Off since 2026-10-18 so it stops spending Anthropic tokens. Its data
+    # and env file stay in /var/lib/jobpilot; health-alert below still reads
+    # the Telegram token from there.
+    enable = false;
 
     # The images are built ON kino from a checkout, not pulled: the project
     # has no release tag yet, so nothing is published on GHCR. The tag is the

@@ -8,7 +8,8 @@
   imports = [ inputs.opportunity-radar.nixosModules.default ];
 
   services.opportunity-radar = {
-    enable = true;
+    # Off since 2026-10-18 so it stops spending Anthropic tokens.
+    enable = false;
 
     # Built ON kino from a checkout, like JobPilot; nothing is published. To
     # update: rsync the checkout to kino, `podman build --format docker -t
