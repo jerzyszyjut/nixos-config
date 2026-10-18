@@ -264,6 +264,18 @@ in
       description = "Calibre-Web-Automated and the book downloader.";
     };
 
+    dashboardHost = lib.mkOption {
+      type = lib.types.str;
+      default = config.networking.hostName;
+      defaultText = lib.literalExpression "config.networking.hostName";
+      example = "192.168.0.118";
+      description = ''
+        Host the dashboard's links point at. The default name only resolves
+        over Tailscale; a LAN address makes the tiles work for devices on the
+        home network instead.
+      '';
+    };
+
     lanInterfaces = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ "wlan0" ];
@@ -1440,6 +1452,7 @@ in
         "localhost:${toString ports.homepage}"
         "127.0.0.1:${toString ports.homepage}"
         "${config.networking.hostName}:${toString ports.homepage}"
+        "${cfg.dashboardHost}:${toString ports.homepage}"
       ];
 
       settings = {
@@ -1477,7 +1490,7 @@ in
           "Oglądanie" = [
             {
               "Jellyfin" = {
-                href = "http://${config.networking.hostName}:${toString ports.jellyfin}";
+                href = "http://${cfg.dashboardHost}:${toString ports.jellyfin}";
                 siteMonitor = "http://localhost:${toString ports.jellyfin}";
                 description = "Biblioteka i odtwarzanie";
                 icon = "jellyfin.png";
@@ -1485,7 +1498,7 @@ in
             }
             {
               "Seerr" = {
-                href = "http://${config.networking.hostName}:${toString ports.seerr}";
+                href = "http://${cfg.dashboardHost}:${toString ports.seerr}";
                 siteMonitor = "http://localhost:${toString ports.seerr}";
                 description = "Tu dodajesz film";
                 icon = "jellyseerr.png";
@@ -1498,7 +1511,7 @@ in
             lib.optionals cfg.music.enable [
             {
               "Navidrome" = {
-                href = "http://${config.networking.hostName}:${toString ports.navidrome}";
+                href = "http://${cfg.dashboardHost}:${toString ports.navidrome}";
                 siteMonitor = "http://localhost:${toString ports.navidrome}";
                 description = "Muzyka — serwer Subsonic dla telefonu";
                 icon = "navidrome.png";
@@ -1506,7 +1519,7 @@ in
             }
             {
               "slskd" = {
-                href = "http://${config.networking.hostName}:${toString ports.slskd}";
+                href = "http://${cfg.dashboardHost}:${toString ports.slskd}";
                 siteMonitor = "http://localhost:${toString ports.slskd}";
                 description = "Soulseek — muzyka niszowa i polska";
                 icon = "soulseek.png";
@@ -1516,7 +1529,7 @@ in
             ++ lib.optionals cfg.books.enable [
             {
               "Book Downloader" = {
-                href = "http://${config.networking.hostName}:${toString ports.bookDownloader}";
+                href = "http://${cfg.dashboardHost}:${toString ports.bookDownloader}";
                 siteMonitor = "http://localhost:${toString ports.bookDownloader}";
                 description = "Szukanie e-booków → ingest";
                 icon = "calibre-web.png";
@@ -1524,7 +1537,7 @@ in
             }
             {
               "Calibre-Web" = {
-                href = "http://${config.networking.hostName}:${toString ports.cwa}";
+                href = "http://${cfg.dashboardHost}:${toString ports.cwa}";
                 siteMonitor = "http://localhost:${toString ports.cwa}";
                 description = "E-booki i wysyłka na Kindle";
                 icon = "calibre-web.png";
@@ -1537,7 +1550,7 @@ in
           "Kuchnia" = [
             {
               "Radarr" = {
-                href = "http://${config.networking.hostName}:${toString ports.radarr}";
+                href = "http://${cfg.dashboardHost}:${toString ports.radarr}";
                 siteMonitor = "http://localhost:${toString ports.radarr}";
                 description = "Kolejka i import";
                 icon = "radarr.png";
@@ -1545,7 +1558,7 @@ in
             }
             {
               "Sonarr" = {
-                href = "http://${config.networking.hostName}:${toString ports.sonarr}";
+                href = "http://${cfg.dashboardHost}:${toString ports.sonarr}";
                 siteMonitor = "http://localhost:${toString ports.sonarr}";
                 description = "Seriale: kolejka i import";
                 icon = "sonarr.png";
@@ -1553,7 +1566,7 @@ in
             }
             {
               "Bazarr" = {
-                href = "http://${config.networking.hostName}:${toString ports.bazarr}";
+                href = "http://${cfg.dashboardHost}:${toString ports.bazarr}";
                 siteMonitor = "http://localhost:${toString ports.bazarr}";
                 description = "Napisy: polskie i angielskie";
                 icon = "bazarr.png";
@@ -1565,7 +1578,7 @@ in
                 # and answers with device XML, which looks like a broken
                 # service if you open it in a browser. That XML is what
                 # Jellyfin wants; /web/ is what you want.
-                href = "http://${config.networking.hostName}:${toString ports.threadfin}/web/";
+                href = "http://${cfg.dashboardHost}:${toString ports.threadfin}/web/";
                 siteMonitor = "http://localhost:${toString ports.threadfin}";
                 description = "Proxy M3U/EPG dla Jellyfin Live TV";
                 icon = "threadfin.png";
@@ -1573,7 +1586,7 @@ in
             }
             {
               "Prowlarr" = {
-                href = "http://${config.networking.hostName}:${toString ports.prowlarr}";
+                href = "http://${cfg.dashboardHost}:${toString ports.prowlarr}";
                 siteMonitor = "http://localhost:${toString ports.prowlarr}";
                 description = "Trackery";
                 icon = "prowlarr.png";
@@ -1581,7 +1594,7 @@ in
             }
             {
               "qBittorrent" = {
-                href = "http://${config.networking.hostName}:${toString ports.qbittorrent}";
+                href = "http://${cfg.dashboardHost}:${toString ports.qbittorrent}";
                 siteMonitor = "http://localhost:${toString ports.qbittorrent}";
                 description = "Transfery (seedowanie wyłączone)";
                 icon = "qbittorrent.png";
@@ -1597,7 +1610,7 @@ in
           ] ++ lib.optionals cfg.music.enable [
             {
               "Soularr" = {
-                href = "http://${config.networking.hostName}:${toString ports.soularr}";
+                href = "http://${cfg.dashboardHost}:${toString ports.soularr}";
                 siteMonitor = "http://localhost:${toString ports.soularr}";
                 description = "Lidarr → Soulseek, automatycznie";
                 icon = "soulseek.png";
@@ -1605,7 +1618,7 @@ in
             }
             {
               "Lidarr" = {
-                href = "http://${config.networking.hostName}:${toString ports.lidarr}";
+                href = "http://${cfg.dashboardHost}:${toString ports.lidarr}";
                 siteMonitor = "http://localhost:${toString ports.lidarr}";
                 description = "Muzyka: kolejka i import";
                 icon = "lidarr.png";

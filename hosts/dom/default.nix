@@ -35,10 +35,15 @@
 
   zramSwap.enable = true;
 
-  # Seerr on the home network too, so the parents can request films from the
-  # browser at http://<dom's LAN address>:5055 (Jellyfin is opened there by
+  # Seerr and the dashboard on the home network too, so the parents can
+  # request films from the browser (Jellyfin is opened there by
   # mediaServer.lanInterfaces). Their own LAN, unlike kino's dorm WiFi.
-  networking.firewall.interfaces.eth0.allowedTCPPorts = [ 5055 ];
+  networking.firewall.interfaces.eth0.allowedTCPPorts = [ 5055 8082 ];
+
+  # The dashboard's tiles link to the LAN address, which the parents' phones
+  # and TV can reach; the name "dom" only resolves over Tailscale. Assigned by
+  # the router's DHCP, so it should be reserved there for 88:a4:c2:de:0b:fb.
+  profiles.mediaServer.dashboardHost = "192.168.0.118";
 
   # ---- GPU: RTX 2060 Super (Turing) ---------------------------------------
   # The Ryzen 5 3600 has no iGPU, so Jellyfin transcodes on NVENC instead of
