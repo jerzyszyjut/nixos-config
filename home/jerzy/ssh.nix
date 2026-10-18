@@ -73,6 +73,14 @@
         ];
       };
 
+      # The parents' home cinema (hosts/dom). No forwards: every web UI there,
+      # qBittorrent included, is reachable as http://dom:<port> over the tailnet.
+      "dom" = {
+        hostname = "dom";
+        user = "jerzy";
+        identityFile = "~/.ssh/default";
+      };
+
       # ---- public hosts ----------------------------------------------
       "github.com" = {
         hostname = "github.com";
