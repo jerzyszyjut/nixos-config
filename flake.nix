@@ -304,8 +304,6 @@
             mediaServer.vpn.address = "10.71.220.144/32";
             mediaServer.vpn.peer.publicKey = "cq9ktmbTZwxYCrCSxV8SItOjRhJhLoYYkPThlifkkVI=";
             mediaServer.vpn.peer.endpoint = "193.32.127.70:51820";
-            # Downloads at night, so they never slow down the parents' internet.
-            mediaServer.nightDownloads.enable = true;
           };
         };
 

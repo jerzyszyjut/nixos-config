@@ -35,6 +35,26 @@
 
   zramSwap.enable = true;
 
+  # ---- GPU: RTX 2060 Super (Turing) ---------------------------------------
+  # The Ryzen 5 3600 has no iGPU, so Jellyfin transcodes on NVENC instead of
+  # kino's QuickSync. The open kernel module supports Turing and up.
+  services.xserver.videoDrivers = [ "nvidia" ];
+  hardware.nvidia = {
+    open = true;
+    modesetting.enable = true;
+    nvidiaSettings = false;
+    package = config.boot.kernelPackages.nvidiaPackages.stable;
+  };
+
+  services.jellyfin = {
+    # The device stays /dev/dri/renderD128: with modesetting on, the NVIDIA
+    # driver provides that render node too.
+    hardwareAcceleration.type = lib.mkForce "nvenc";
+    # Turing's NVDEC has no AV1; everything else media-server.nix turns on
+    # it decodes.
+    transcoding.hardwareDecodingCodecs.av1 = lib.mkForce false;
+  };
+
   # ---- always on ---------------------------------------------------------
   # A desktop does not suspend on a lid, but systemd will idle-suspend a
   # machine nobody is logged into. Same block as kino.
