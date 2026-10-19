@@ -45,6 +45,16 @@
   # the router's DHCP, so it should be reserved there for 88:a4:c2:de:0b:fb.
   profiles.mediaServer.dashboardHost = "192.168.0.118";
 
+  # The parents' line does ~830/70 Mbit/s (~285 through Mullvad, 2026-10-19),
+  # far more than kino's three-at-a-time queue uses. Stalled torrents (old
+  # Polish releases with one seeder) no longer hold a slot either.
+  services.qbittorrent.serverConfig.BitTorrent.Session = {
+    MaxActiveDownloads = lib.mkForce 12;
+    MaxActiveTorrents = lib.mkForce 20;
+    MaxConnections = lib.mkForce 600;
+    IgnoreSlowTorrentsForQueueing = true;
+  };
+
   # Films downloaded from Jellyfin to a phone keep their subtitles.
   profiles.mediaServer.embedSubtitles.enable = true;
 
