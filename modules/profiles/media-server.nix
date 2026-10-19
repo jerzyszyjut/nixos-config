@@ -200,6 +200,12 @@ in
       };
     };
 
+    stalledCleanup.enable = lib.mkEnableOption ''
+      replacing downloads that have stalled: a Radarr or Sonarr torrent with
+      no progress for hours is removed, its release blocklisted, and a new
+      search started, so a release with reachable seeders gets a turn
+    '';
+
     embedSubtitles.enable = lib.mkEnableOption ''
       copying the external .srt subtitles next to every MKV in the library
       into the MKV itself, so a film downloaded from Jellyfin for offline
@@ -1120,6 +1126,51 @@ in
         ${pkgs.gnused}/bin/sed -i 's/^\(\s*\)ip: 127\.0\.0\.1\s*$/\1ip: 0.0.0.0/' "$cfg"
       fi
     '';
+
+    # ---- stalled downloads --------------------------------------------
+    # Behind Mullvad there is no forwarded port (Mullvad dropped port
+    # forwarding in 2023), so a torrent can only reach seeders that have one.
+    # A rare release whose few seeders are all unreachable sits at 0% for
+    # ever, and Radarr/Sonarr never give up on it. This gives up for them:
+    # a torrent in their categories with no new data for `idle` is removed
+    # through their own queue API with blocklist=true, which also starts a
+    # search for another release. Hand-added torrents (other categories)
+    # are left alone.
+    systemd.services.stalled-cleanup = lib.mkIf cfg.stalledCleanup.enable {
+      description = "Replace stalled Radarr/Sonarr downloads";
+      serviceConfig.Type = "oneshot";
+      path = [ pkgs.curl pkgs.jq pkgs.gnused pkgs.coreutils ];
+      script = ''
+        idle=$((6 * 3600))
+        now=$(date +%s)
+        qb=http://127.0.0.1:${toString ports.qbittorrent}/api/v2
+        key() { sed -n 's:.*<ApiKey>\(.*\)</ApiKey>.*:\1:p' "$1/config.xml"; }
+
+        stalled=$(curl -sf "$qb/torrents/info" | jq -c --argjson now "$now" --argjson idle "$idle" '
+          [ .[] | select(.progress < 1 and (.category == "radarr" or .category == "tv-sonarr"))
+                | select(.state == "stalledDL" or .state == "metaDL")
+                | select($now - .added_on > $idle and $now - .last_activity > $idle)
+                | .hash | ascii_upcase ]')
+        [ "$stalled" = "[]" ] && exit 0
+
+        for arr in "${toString ports.radarr} $(key ${config.services.radarr.dataDir})" \
+                   "${toString ports.sonarr} $(key ${config.services.sonarr.dataDir})"; do
+          set -- $arr
+          curl -sf "http://127.0.0.1:$1/api/v3/queue?pageSize=1000" -H "X-Api-Key: $2" \
+            | jq -r --argjson h "$stalled" '.records[] | select(.downloadId as $d | $h | index($d)) | "\(.id)\t\(.title)"' \
+            | while IFS=$'\t' read -r id title; do
+                echo "replacing stalled: $title"
+                curl -sf -X DELETE -H "X-Api-Key: $2" \
+                  "http://127.0.0.1:$1/api/v3/queue/$id?removeFromClient=true&blocklist=true&skipRedownload=false" \
+                  || echo "  failed"
+              done
+        done
+      '';
+    };
+    systemd.timers.stalled-cleanup = lib.mkIf cfg.stalledCleanup.enable {
+      wantedBy = [ "timers.target" ];
+      timerConfig = { OnBootSec = "15min"; OnUnitActiveSec = "30min"; };
+    };
 
     # ---- subtitles inside the file ------------------------------------
     # Jellyfin's "Download" hands over the video file only; the .srt files

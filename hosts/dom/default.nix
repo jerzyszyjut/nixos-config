@@ -55,6 +55,10 @@
     IgnoreSlowTorrentsForQueueing = true;
   };
 
+  # Rare old releases often have no seeder reachable without a forwarded
+  # port; swap those for another release instead of waiting for ever.
+  profiles.mediaServer.stalledCleanup.enable = true;
+
   # Films downloaded from Jellyfin to a phone keep their subtitles.
   profiles.mediaServer.embedSubtitles.enable = true;
 
