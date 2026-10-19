@@ -45,6 +45,9 @@
   # the router's DHCP, so it should be reserved there for 88:a4:c2:de:0b:fb.
   profiles.mediaServer.dashboardHost = "192.168.0.118";
 
+  # Films downloaded from Jellyfin to a phone keep their subtitles.
+  profiles.mediaServer.embedSubtitles.enable = true;
+
   # ---- GPU: RTX 2060 Super (Turing) ---------------------------------------
   # The Ryzen 5 3600 has no iGPU, so Jellyfin transcodes on NVENC instead of
   # kino's QuickSync. The open kernel module supports Turing and up.
