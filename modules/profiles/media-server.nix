@@ -1124,12 +1124,12 @@ in
     # ---- subtitles inside the file ------------------------------------
     # Jellyfin's "Download" hands over the video file only; the .srt files
     # Bazarr keeps beside it stay behind. This muxes every one of them into
-    # the MKV, so offline copies have them, from any app.
+    # the video file, so offline copies have them, from any app.
     #
     # A timer rather than Bazarr's post-processing hook: for an uploaded
     # subtitle Bazarr runs the hook BEFORE it syncs, so the hook would embed
     # the unsynced text. Here a film is due when one of its .srt files is
-    # newer than the MKV and has been left alone for a few minutes, which
+    # newer than the video and has been left alone for a few minutes, which
     # covers Bazarr's downloads, syncs and uploads, and files dropped in by
     # hand or through Jellyfin.
     #
@@ -1137,10 +1137,11 @@ in
     # would otherwise fetch them again. Tracks this added are the last N
     # subtitle tracks, N kept in the user.subs.added xattr, and are dropped
     # before re-adding, so a re-sync replaces rather than piles up. The
-    # original subtitle tracks are never touched. Only MKV: muxing an MP4
-    # into MKV would rename the file under Radarr.
+    # original subtitle tracks are never touched. MKV goes through mkvmerge;
+    # MP4 through ffmpeg as mov_text and stays MP4, since a new extension
+    # would rename the file under Radarr.
     systemd.services.embed-subtitles = lib.mkIf cfg.embedSubtitles.enable {
-      description = "Copy external subtitles into the MKV files";
+      description = "Copy external subtitles into the video files";
       serviceConfig = {
         Type = "oneshot";
         User = "bazarr";
@@ -1149,53 +1150,91 @@ in
         Nice = 15;
         IOSchedulingClass = "idle";
       };
-      path = [ pkgs.mkvtoolnix-cli pkgs.jq pkgs.attr pkgs.coreutils pkgs.findutils pkgs.gnugrep ];
+      path = [ pkgs.mkvtoolnix-cli pkgs.ffmpeg-headless pkgs.jq pkgs.attr pkgs.coreutils pkgs.findutils pkgs.gnugrep ];
       script = ''
         settle=180   # seconds an .srt must be untouched (Bazarr's sync rewrites it)
         now=$(date +%s)
-        find ${moviesDir} ${tvDir} -type f -name '*.mkv' 2>/dev/null | while IFS= read -r mkv; do
-          base=''${mkv%.mkv}
+
+        # MP4 wants ISO 639-2 language tags; Bazarr names files with 639-1.
+        lang3() {
+          case "$1" in
+            pl) echo pol ;; en) echo eng ;; de) echo ger ;; fr) echo fre ;;
+            es) echo spa ;; it) echo ita ;; *) echo "$1" ;;
+          esac
+        }
+
+        embed_mkv() { # video base tmp added srts...
+          local video=$1 base=$2 tmp=$3 added=$4; shift 4
+          local drop
+          drop=$(mkvmerge -J "$video" | jq -r --argjson n "$added" \
+            '[.tracks[] | select(.type=="subtitles") | .id] | if $n > 0 then .[-$n:] else [] end | join(",")')
+          local args=(-o "$tmp")
+          [ -n "$drop" ] && args+=(--subtitle-tracks "!$drop")
+          args+=("$video")
+          local s rest lang
+          for s in "$@"; do
+            # Name.pl.srt, Name.en.forced.srt -> language is the part after the film's name
+            rest=''${s#"$base".}; lang=''${rest%%.*}
+            args+=(--language "0:$lang" --track-name "0:$lang" --sub-charset "0:UTF-8" "$s")
+          done
+          # mkvmerge exits 1 for warnings (odd timestamps and the like) with a
+          # perfectly good file; only 2 is an error.
+          local rc=0; mkvmerge -q "''${args[@]}" || rc=$?
+          [ "$rc" -le 1 ]
+        }
+
+        embed_mp4() { # video base tmp added srts...
+          local video=$1 base=$2 tmp=$3 added=$4; shift 4
+          local nsub keep i j s rest lang
+          nsub=$(ffprobe -v error -select_streams s -show_entries stream=index -of csv=p=0 "$video" | wc -l)
+          keep=$((nsub - added)); [ "$keep" -lt 0 ] && keep=0
+          local args=(-nostdin -v error -y -i "$video")
+          for s in "$@"; do args+=(-sub_charenc UTF-8 -i "$s"); done
+          args+=(-map 0:v -map '0:a?')
+          for ((i = 0; i < keep; i++)); do args+=(-map "0:s:$i"); done
+          for ((j = 1; j <= $#; j++)); do args+=(-map "$j:0"); done
+          args+=(-map_metadata 0 -map_chapters 0 -c copy -c:s mov_text)
+          j=$keep
+          for s in "$@"; do
+            rest=''${s#"$base".}; lang=''${rest%%.*}
+            args+=("-metadata:s:s:$j" "language=$(lang3 "$lang")" "-metadata:s:s:$j" "title=$lang")
+            j=$((j + 1))
+          done
+          args+=(-movflags +faststart -f mp4 "$tmp")
+          ffmpeg "''${args[@]}"
+        }
+
+        find ${moviesDir} ${tvDir} -type f \( -name '*.mkv' -o -name '*.mp4' \) 2>/dev/null | while IFS= read -r video; do
+          ext=''${video##*.}
+          base=''${video%.*}
           srts=()
           due=
           for s in "$base".*.srt; do
             [ -e "$s" ] || continue
             m=$(stat -c %Y "$s")
             [ $((now - m)) -lt $settle ] && { due=; srts=(); break; }
-            [ "$s" -nt "$mkv" ] && due=1
+            [ "$s" -nt "$video" ] && due=1
             srts+=("$s")
           done
           [ -n "$due" ] || continue
 
-          size=$(stat -c %s "$mkv")
-          free=$(( $(df --output=avail -B1 "$(dirname "$mkv")" | tail -1) ))
+          size=$(stat -c %s "$video")
+          free=$(( $(df --output=avail -B1 "$(dirname "$video")" | tail -1) ))
           if [ "$free" -lt $((size + size / 10)) ]; then
-            echo "skip (no space): $mkv"; continue
+            echo "skip (no space): $video"; continue
           fi
 
-          # Subtitle tracks to drop: the ones a previous run appended.
-          added=$(getfattr --only-values -n user.subs.added "$mkv" 2>/dev/null || echo 0)
-          drop=$(mkvmerge -J "$mkv" | jq -r --argjson n "$added" \
-            '[.tracks[] | select(.type=="subtitles") | .id] | if $n > 0 then .[-$n:] else [] end | join(",")')
+          # How many subtitle tracks a previous run appended (dropped and redone).
+          added=$(getfattr --only-values -n user.subs.added "$video" 2>/dev/null || echo 0)
+          tmp="$base.embedding.tmp"
 
-          args=(-o "$base.embedding.tmp")
-          [ -n "$drop" ] && args+=(--subtitle-tracks "!$drop")
-          args+=("$mkv")
-          for s in "''${srts[@]}"; do
-            # Name.pl.srt, Name.en.forced.srt -> language is the part after the film's name
-            rest=''${s#"$base".}; lang=''${rest%%.*}
-            args+=(--language "0:$lang" --track-name "0:$lang" --sub-charset "0:UTF-8" "$s")
-          done
-
-          echo "embedding ''${#srts[@]} subtitle file(s): $mkv"
-          # mkvmerge exits 1 for warnings (odd timestamps and the like) with a
-          # perfectly good file; only 2 is an error.
-          rc=0; mkvmerge -q "''${args[@]}" || rc=$?
-          if [ "$rc" -le 1 ] && [ -s "$base.embedding.tmp" ]; then
-            setfattr -n user.subs.added -v "''${#srts[@]}" "$base.embedding.tmp"
-            chmod 664 "$base.embedding.tmp"
-            mv -f "$base.embedding.tmp" "$mkv"
+          echo "embedding ''${#srts[@]} subtitle file(s): $video"
+          if "embed_$ext" "$video" "$base" "$tmp" "$added" "''${srts[@]}" && [ -s "$tmp" ]; then
+            setfattr -n user.subs.added -v "''${#srts[@]}" "$tmp"
+            chmod 664 "$tmp"
+            mv -f "$tmp" "$video"
           else
-            echo "mkvmerge failed: $mkv"; rm -f "$base.embedding.tmp"
+            echo "embedding failed: $video"; rm -f "$tmp"
           fi
         done
       '';
