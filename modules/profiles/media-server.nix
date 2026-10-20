@@ -1157,7 +1157,7 @@ in
         StateDirectory = "subtitle-fallback";
         Nice = 15;
       };
-      path = [ pkgs.curl pkgs.jq pkgs.yq-go pkgs.ffmpeg-headless pkgs.coreutils pkgs.gnugrep pkgs.util-linux ];
+      path = [ pkgs.curl pkgs.jq pkgs.yq-go pkgs.ffmpeg-headless pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.util-linux ];
       script = ''
         wait=$((12 * 3600))
         state=/var/lib/subtitle-fallback/translated
@@ -1167,6 +1167,11 @@ in
         key=$(yq '.auth.apikey' /var/lib/bazarr/config/config.yaml)
         get()   { curl -sf -H "X-API-KEY: $key" "$api/$1"; }
         now=$(date +%s)
+        # When Radarr imported each film. Not the file's mtime: embed-subtitles
+        # rewrites the file whenever subtitles arrive, which restarts that clock.
+        rkey=$(sed -n 's:.*<ApiKey>\(.*\)</ApiKey>.*:\1:p' ${config.services.radarr.dataDir}/config.xml)
+        imported=$(curl -sf -H "X-Api-Key: $rkey" http://127.0.0.1:${toString ports.radarr}/api/v3/movie \
+          | jq -c 'map(select(.hasFile) | {key: (.id | tostring), value: (.movieFile.dateAdded | sub("\\.[0-9]+"; "") | fromdateiso8601)}) | from_entries')
 
         # ---- 1. translate where nothing real has turned up ----------------
         get 'movies?length=-1' | jq -c '.data[]
@@ -1175,7 +1180,8 @@ in
         | while read -r m; do
           id=$(jq -r .id <<<"$m"); video=$(jq -r .path <<<"$m"); title=$(jq -r .title <<<"$m")
           [ -f "$video" ] || continue
-          [ $((now - $(stat -c %Y "$video"))) -gt $wait ] || continue
+          added=$(jq -r --arg id "$id" '.[$id] // 0' <<<"$imported")
+          [ "$added" -gt 0 ] && [ $((now - added)) -gt $wait ] || continue
           grep -qx "$id" "$state" && continue
 
           en=$(jq -r '.subs[0] // empty' <<<"$m")
