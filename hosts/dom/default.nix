@@ -59,6 +59,9 @@
   # port; swap those for another release instead of waiting for ever.
   profiles.mediaServer.stalledCleanup.enable = true;
 
+  # Machine-translated Polish where providers have nothing (yet).
+  profiles.mediaServer.subtitleFallback.enable = true;
+
   # Films downloaded from Jellyfin to a phone keep their subtitles.
   profiles.mediaServer.embedSubtitles.enable = true;
 

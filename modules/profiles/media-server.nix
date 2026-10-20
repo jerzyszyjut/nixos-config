@@ -200,6 +200,13 @@ in
       };
     };
 
+    subtitleFallback.enable = lib.mkEnableOption ''
+      machine-translated Polish subtitles for films that have none yet:
+      after 12 hours without real ones, Bazarr translates the English
+      subtitles (Google Translate); once a day films with a translation are
+      searched again and a real Polish subtitle replaces it when one turns up
+    '';
+
     stalledCleanup.enable = lib.mkEnableOption ''
       replacing downloads that have stalled: a Radarr or Sonarr torrent with
       no progress for hours is removed, its release blocklisted, and a new
@@ -1126,6 +1133,99 @@ in
         ${pkgs.gnused}/bin/sed -i 's/^\(\s*\)ip: 127\.0\.0\.1\s*$/\1ip: 0.0.0.0/' "$cfg"
       fi
     '';
+
+    # ---- machine-translated subtitles as a stopgap ------------------------
+    # Bazarr can translate a subtitle file, but only as a manual action, and
+    # a translated Polish file counts as "Polish present" — it would never
+    # look for a real one again. So this drives it from outside:
+    #
+    #   1. a film missing Polish whose file is older than `wait` gets Bazarr's
+    #      translation of its English subtitle. English that exists only as an
+    #      embedded text track is extracted next to the film first, since
+    #      Bazarr translates external files only;
+    #   2. the films translated that way are listed in $state, and once a day
+    #      each is searched again (searching costs no download quota). When a
+    #      provider has real Polish, that is downloaded over the translation
+    #      (Bazarr then syncs it) and the film leaves the list.
+    #
+    # Films only; the series here are Polish-language and need no subtitles.
+    systemd.services.subtitle-fallback = lib.mkIf cfg.subtitleFallback.enable {
+      description = "Machine-translated Polish subtitles until real ones exist";
+      after = [ "bazarr.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        StateDirectory = "subtitle-fallback";
+        Nice = 15;
+      };
+      path = [ pkgs.curl pkgs.jq pkgs.yq-go pkgs.ffmpeg-headless pkgs.coreutils pkgs.gnugrep pkgs.util-linux ];
+      script = ''
+        wait=$((12 * 3600))
+        state=/var/lib/subtitle-fallback/translated
+        stamp=/var/lib/subtitle-fallback/last-recheck
+        touch "$state"
+        api=http://127.0.0.1:${toString ports.bazarr}/api
+        key=$(yq '.auth.apikey' /var/lib/bazarr/config/config.yaml)
+        get()   { curl -sf -H "X-API-KEY: $key" "$api/$1"; }
+        now=$(date +%s)
+
+        # ---- 1. translate where nothing real has turned up ----------------
+        get 'movies?length=-1' | jq -c '.data[]
+            | select(([.missing_subtitles[]?.code2] | index("pl")) and .path != null)
+            | {id: .radarrId, path, title, subs: [.subtitles[]? | select(.code2 == "en" and .path != null) | .path]}' \
+        | while read -r m; do
+          id=$(jq -r .id <<<"$m"); video=$(jq -r .path <<<"$m"); title=$(jq -r .title <<<"$m")
+          [ -f "$video" ] || continue
+          [ $((now - $(stat -c %Y "$video"))) -gt $wait ] || continue
+          grep -qx "$id" "$state" && continue
+
+          en=$(jq -r '.subs[0] // empty' <<<"$m")
+          if [ -z "$en" ]; then
+            # the first embedded English text track, if any
+            idx=$(ffprobe -v error -select_streams s -show_entries stream=index,codec_name:stream_tags=language \
+                    -of json "$video" | jq -r '[.streams[] | select((.tags.language // "") | test("^en"))
+                    | select(.codec_name | test("subrip|ass|ssa|mov_text|webvtt|text"))][0].index // empty')
+            [ -n "$idx" ] || { echo "no English to translate: $title"; continue; }
+            en="''${video%.*}.en.srt"
+            ffmpeg -nostdin -v error -y -i "$video" -map "0:$idx" -c:s srt "$en" || { rm -f "$en"; continue; }
+            chown bazarr:media "$en"; chmod 664 "$en"
+            curl -sf -X PATCH -H "X-API-KEY: $key" "$api/movies?radarrid=$id&action=scan-disk" >/dev/null
+            sleep 5
+          fi
+
+          echo "translating to Polish: $title"
+          if curl -sf -X PATCH -H "X-API-KEY: $key" "$api/subtitles?action=translate" \
+               --data-urlencode type=movie --data-urlencode "id=$id" --data-urlencode language=pl \
+               --data-urlencode "path=$en" --data-urlencode forced=False --data-urlencode hi=False >/dev/null; then
+            echo "$id" >> "$state"
+          else
+            echo "  translation failed"
+          fi
+        done
+
+        # ---- 2. once a day: swap translations for real subtitles ----------
+        last=$(cat "$stamp" 2>/dev/null || echo 0)
+        [ $((now - last)) -gt $((20 * 3600)) ] || exit 0
+        echo "$now" > "$stamp"
+        for id in $(sort -u "$state"); do
+          best=$(get "providers/movies?radarrid=$id" | jq -c '[.data[] | select(.language == "pl")] | sort_by(-.score) | .[0] // empty')
+          [ -n "$best" ] || continue
+          echo "real Polish found for radarr id $id ($(jq -r .provider <<<"$best"), score $(jq -r .score <<<"$best"))"
+          if curl -sf -X POST -H "X-API-KEY: $key" "$api/providers/movies" \
+               --data-urlencode "radarrid=$id" \
+               --data-urlencode "hi=$(jq -r '.hi | if . then "True" else "False" end' <<<"$best")" \
+               --data-urlencode "forced=$(jq -r '.forced | if . then "True" else "False" end' <<<"$best")" \
+               --data-urlencode "original_format=$(jq -r '.original_format | if . then "True" else "False" end' <<<"$best")" \
+               --data-urlencode "provider=$(jq -r .provider <<<"$best")" \
+               --data-urlencode "subtitle=$(jq -r .subtitle <<<"$best")" >/dev/null; then
+            sed -i "/^$id\$/d" "$state"
+          fi
+        done
+      '';
+    };
+    systemd.timers.subtitle-fallback = lib.mkIf cfg.subtitleFallback.enable {
+      wantedBy = [ "timers.target" ];
+      timerConfig = { OnBootSec = "30min"; OnUnitActiveSec = "6h"; };
+    };
 
     # ---- stalled downloads --------------------------------------------
     # Behind Mullvad there is no forwarded port (Mullvad dropped port
