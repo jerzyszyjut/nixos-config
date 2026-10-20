@@ -202,7 +202,7 @@ in
 
     subtitleFallback.enable = lib.mkEnableOption ''
       machine-translated Polish subtitles for films that have none yet:
-      after 12 hours without real ones, Bazarr translates the English
+      after 6 hours without real ones, Bazarr translates the English
       subtitles (Google Translate); once a day films with a translation are
       searched again and a real Polish subtitle replaces it when one turns up
     '';
@@ -1159,7 +1159,7 @@ in
       };
       path = [ pkgs.curl pkgs.jq pkgs.yq-go pkgs.ffmpeg-headless pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.util-linux ];
       script = ''
-        wait=$((12 * 3600))
+        wait=$((6 * 3600))   # one Bazarr search cycle
         state=/var/lib/subtitle-fallback/translated
         stamp=/var/lib/subtitle-fallback/last-recheck
         touch "$state"
