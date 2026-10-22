@@ -1175,6 +1175,7 @@ in
           | jq -c 'map(select(.hasFile) | {key: (.id | tostring), value: (.movieFile.dateAdded | sub("\\.[0-9]+"; "") | fromdateiso8601)}) | from_entries')
 
         # ---- 1. translate where nothing real has turned up ----------------
+        done_=0
         get 'movies?length=-1' | jq -c '.data[]
             | select(([.missing_subtitles[]?.code2] | index("pl")) and .path != null)
             | {id: .radarrId, path, title, subs: [.subtitles[]? | select(.code2 == "en" and .path != null) | .path]}' \
@@ -1184,6 +1185,7 @@ in
           added=$(jq -r --arg id "$id" '.[$id] // 0' <<<"$imported")
           [ "$added" -gt 0 ] && [ $((now - added)) -gt $wait ] || continue
           grep -qx "$id" "$state" && continue
+          [ "$done_" -lt 8 ] || continue
 
           en=$(jq -r '.subs[0] // empty' <<<"$m")
           if [ -z "$en" ]; then
@@ -1199,14 +1201,32 @@ in
             sleep 5
           fi
 
+          # One film at a time, and a few per run: Google allows 5 requests a
+          # second, Bazarr fires its batches in parallel, and when refused it
+          # writes the ENGLISH text out under the .pl name (with its "translated
+          # with Google Translate" header) — on 2026-10-20 thirty films at once
+          # produced sixteen of those.
+          pl="''${en%.en.srt}.pl.srt"; [ "$pl" = "$en" ] && pl="''${video%.*}.pl.srt"
           echo "translating to Polish: $title"
-          if curl -sf -X PATCH -H "X-API-KEY: $key" "$api/subtitles?action=translate" \
+          start=$(date +%s)
+          curl -sf -X PATCH -H "X-API-KEY: $key" "$api/subtitles?action=translate" \
                --data-urlencode type=movie --data-urlencode "id=$id" --data-urlencode language=pl \
-               --data-urlencode "path=$en" --data-urlencode forced=False --data-urlencode hi=False >/dev/null; then
+               --data-urlencode "path=$en" --data-urlencode forced=False --data-urlencode hi=False >/dev/null \
+            || { echo "  request failed"; continue; }
+          # Bazarr queues the job; wait for the file, up to 15 minutes.
+          for _ in $(seq 1 90); do
+            [ -f "$pl" ] && [ "$(stat -c %Y "$pl")" -ge "$start" ] && break
+            sleep 10
+          done
+          done_=$((done_ + 1))
+          if [ -f "$pl" ] && [ "$(stat -c %Y "$pl")" -ge "$start" ] && grep -qE '[ąęłśżźćń]' "$pl"; then
             echo "$id" >> "$state"
           else
-            echo "  translation failed"
+            echo "  not translated (rate limit?), removing"
+            [ -f "$pl" ] && [ "$(stat -c %Y "$pl")" -ge "$start" ] && rm -f "$pl"
+            curl -sf -X PATCH -H "X-API-KEY: $key" "$api/movies?radarrid=$id&action=scan-disk" >/dev/null || true
           fi
+          sleep 30
         done
 
         # Bazarr's Google Translate client never closes its connections: each
