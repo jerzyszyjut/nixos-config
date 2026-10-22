@@ -1157,12 +1157,13 @@ in
         StateDirectory = "subtitle-fallback";
         Nice = 15;
       };
-      path = [ pkgs.curl pkgs.jq pkgs.yq-go pkgs.ffmpeg-headless pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.util-linux ];
+      path = [ pkgs.curl pkgs.jq pkgs.yq-go pkgs.ffmpeg-headless pkgs.coreutils pkgs.gnugrep pkgs.gnused pkgs.util-linux pkgs.systemd ];
       script = ''
         wait=$((6 * 3600))   # one Bazarr search cycle
         state=/var/lib/subtitle-fallback/translated
         stamp=/var/lib/subtitle-fallback/last-recheck
         touch "$state"
+        before=$(wc -l < "$state")
         api=http://127.0.0.1:${toString ports.bazarr}/api
         key=$(yq '.auth.apikey' /var/lib/bazarr/config/config.yaml)
         get()   { curl -sf -H "X-API-KEY: $key" "$api/$1"; }
@@ -1208,6 +1209,17 @@ in
           fi
         done
 
+        # Bazarr's Google Translate client never closes its connections: each
+        # translated file leaves dozens of sockets in CLOSE-WAIT, and on
+        # 2026-10-21 about thirty films exhausted its file descriptors, after
+        # which it could not open its own database and stopped working
+        # altogether. A restart drops them.
+        if [ "$(wc -l < "$state")" != "$before" ]; then
+          echo "restarting Bazarr to drop the translator's leaked connections"
+          systemctl restart bazarr.service
+          sleep 30
+        fi
+
         # ---- 2. once a day: swap translations for real subtitles ----------
         last=$(cat "$stamp" 2>/dev/null || echo 0)
         [ $((now - last)) -gt $((20 * 3600)) ] || exit 0
@@ -1228,6 +1240,9 @@ in
         done
       '';
     };
+    # Headroom for the leak above between restarts (the default is 1024).
+    systemd.services.bazarr.serviceConfig.LimitNOFILE = lib.mkIf cfg.subtitleFallback.enable 65536;
+
     systemd.timers.subtitle-fallback = lib.mkIf cfg.subtitleFallback.enable {
       wantedBy = [ "timers.target" ];
       timerConfig = { OnBootSec = "30min"; OnUnitActiveSec = "6h"; };
