@@ -560,6 +560,13 @@ in
           MaxActiveDownloads = 3;
           MaxActiveTorrents = 8;
           MaxConnections = 200;
+
+          # Never download programs. A "TV episode" that is a 1 GB .exe is
+          # malware bait (Reacher S04E08 came twice that way, 2026-10-24);
+          # with its only file excluded the torrent brings nothing and the
+          # *arr marks it failed and searches again.
+          ExcludedFileNamesEnabled = true;
+          ExcludedFileNames = "*.exe, *.scr, *.com, *.bat, *.cmd, *.msi, *.lnk, *.ps1, *.vbs, *.js, *.jar, *.apk";
         } // lib.optionalAttrs cfg.vpn.enable {
           # Bind every peer connection to the tunnel interface.
           #
