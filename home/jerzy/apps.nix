@@ -29,6 +29,10 @@
       confirm_os_window_close = 0;
       cursor_shape = "beam";
       cursor_trail = 1;
+      # Off: kitty otherwise remembers the last window's maximized state, and
+      # once one had been maximized every new one asked Hyprland to maximize
+      # too, covering the whole workspace. Hyprland does the sizing.
+      remember_window_size = "no";
       # kitty has native tabs and splits, so zellij below is only really
       # needed for sessions that must survive a disconnect.
       tab_bar_edge = "top";
