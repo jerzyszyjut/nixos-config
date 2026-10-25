@@ -147,9 +147,23 @@ def embedded(video, lang, ffmpeg, tmpdir):
     return None
 
 
+# Videos that could not be combined, keyed by path, valued by the newest
+# mtime among the video and its subtitle files at that moment. Without it a
+# film missing one language had its embedded tracks extracted again every
+# half hour — ffmpeg reads the whole video for that — which on kino came to
+# 17-28 GB read per run, round the clock, to the same "nothing to do".
+SKIP_CACHE = os.environ.get("STATE_DIRECTORY", "/tmp") + "/unmergeable.json"
+
+
 def main():
     lang_a, lang_b, ffmpeg, *roots = sys.argv[1:]
-    made = kept = 0
+    made = kept = skipped = 0
+    try:
+        with open(SKIP_CACHE) as f:
+            unmergeable = json.load(f)
+    except (OSError, ValueError):
+        unmergeable = {}
+    seen = set()
     for root in roots:
         for folder, _, files in os.walk(root):
             for name in files:
@@ -166,10 +180,16 @@ def main():
                     if os.path.exists(target) and os.path.getmtime(target) >= newest:
                         kept += 1
                         continue
+                    seen.add(video)
+                    if unmergeable.get(video) == newest:
+                        skipped += 1
+                        continue
                     src_a = ext_a or embedded(video, lang_a, ffmpeg, tmp)
                     src_b = ext_b or embedded(video, lang_b, ffmpeg, tmp)
                     if not src_a or not src_b:
+                        unmergeable[video] = newest
                         continue
+                    unmergeable.pop(video, None)
                     cues = merge(parse_srt(src_a), parse_srt(src_b))
                     if not cues:
                         continue
@@ -180,7 +200,12 @@ def main():
                     os.chmod(target, 0o664)
                     made += 1
                     print(f"wrote {target} ({len(cues)} cues)")
-    print(f"done: {made} written, {kept} already up to date")
+    unmergeable = {v: m for v, m in unmergeable.items() if v in seen}
+    with open(SKIP_CACHE + ".tmp", "w") as f:
+        json.dump(unmergeable, f)
+    os.replace(SKIP_CACHE + ".tmp", SKIP_CACHE)
+    print(f"done: {made} written, {kept} already up to date, "
+          f"{skipped} still missing a language (unchanged, skipped)")
 
 
 main()

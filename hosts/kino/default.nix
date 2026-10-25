@@ -304,7 +304,7 @@
   systemd.services.health-alert = {
     description = "Telegram alerts for power loss and high temperatures";
     serviceConfig.Type = "oneshot";
-    path = [ pkgs.curl pkgs.coreutils pkgs.gnugrep ];
+    path = [ pkgs.curl pkgs.coreutils pkgs.gnugrep pkgs.procps pkgs.gawk ];
     script = ''
       env=/var/lib/jobpilot/jobpilot.env
       state=/run/health-alert
@@ -345,7 +345,10 @@
         [ "$(cat $z/type)" = x86_pkg_temp ] && cpu=$(( $(cat $z/temp) / 1000 ))
       done
       if [ "$cpu" -ge 85 ]; then
-        [ -e "$state/cpu-warm" ] && flag cpu-hot on "🔥 procesor ma $cpu °C" "" || touch "$state/cpu-warm"
+        # Name what is burning it: on 2026-10-25 the fans woke someone at
+        # 3 a.m. and the log afterwards could not say which process it was.
+        top3=$(ps -eo pcpu=,comm= --sort=-pcpu | head -3 | awk '{printf "%s%s %s%%", (NR>1?", ":""), $2, $1}')
+        [ -e "$state/cpu-warm" ] && flag cpu-hot on "🔥 procesor ma $cpu °C (najwięcej: $top3)" "" || touch "$state/cpu-warm"
       elif [ "$cpu" -lt 75 ]; then
         rm -f "$state/cpu-warm"
         flag cpu-hot off "" "procesor ostygł do $cpu °C"

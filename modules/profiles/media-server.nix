@@ -717,6 +717,8 @@ in
         Group = "media";
         UMask = "0002";
         Nice = 10;
+        IOSchedulingClass = "idle";
+        StateDirectory = "dual-subtitles"; # remembers films it cannot combine
         ExecStart = "${pkgs.python3}/bin/python3 ${./dual-subs.py} ${lib.concatStringsSep " " cfg.dualSubtitles.languages} ${pkgs.jellyfin-ffmpeg}/bin ${moviesDir} ${tvDir}";
       };
     };
