@@ -171,9 +171,14 @@ def main():
                     continue
                 video = os.path.join(folder, name)
                 stem = f"{os.path.splitext(video)[0]}.{lang_a.upper()}+{lang_b.upper()}"
-                target = f"{stem}.{lang_a}.srt"
-                if os.path.exists(f"{stem}.und.srt"):  # name used before 2026-09-30
-                    os.replace(f"{stem}.und.srt", target)
+                # "mul" (multiple languages), not the first language: tagged
+                # "en" it was Jellyfin's automatic pick ahead of the plain
+                # English file, so mpv-shim played it by default and German
+                # lines turned up mid-film. Earlier names are renamed in place.
+                target = f"{stem}.mul.srt"
+                for old in (f"{stem}.und.srt", f"{stem}.{lang_a}.srt"):
+                    if os.path.exists(old):
+                        os.replace(old, target)
                 with tempfile.TemporaryDirectory() as tmp:
                     ext_a, ext_b = external(video, lang_a), external(video, lang_b)
                     newest = max((os.path.getmtime(p) for p in (ext_a, ext_b, video) if p))

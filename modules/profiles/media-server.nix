@@ -698,12 +698,11 @@ in
     # TWO-LANGUAGE SUBTITLES
     #
     # Bazarr fetches each language as its own file; dual-subs.py combines
-    # two of them into "<film>.EN+DE.en.srt" next to the video, which
-    # Jellyfin lists as one more English track titled "EN+DE". Tagged with
-    # the first language so players that auto-pick the preferred subtitle
-    # language can land on it. That is safe for Bazarr's bookkeeping only
-    # because the file is never written unless real subtitles in that
-    # language already exist — it cannot mask a missing one.
+    # two of them into "<film>.EN+DE.mul.srt" next to the video, which
+    # Jellyfin lists as one more track titled "EN+DE". Tagged "mul" on
+    # purpose: tagged with the first language it was Jellyfin's default pick
+    # over the plain English file (so mpv-shim played it unasked), and it
+    # carries the second language's timing faults with it.
     #
     # Runs as bazarr, which already owns the other subtitle files and has
     # group write on the library. Films and series; outputs newer than their
