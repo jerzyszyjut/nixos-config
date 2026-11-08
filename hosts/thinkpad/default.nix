@@ -59,13 +59,16 @@
       CPU_SCALING_GOVERNOR_ON_AC = "performance";
       CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
 
-      CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
+      CPU_ENERGY_PERF_POLICY_ON_BAT = "balance_power";
       CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
 
       CPU_MIN_PERF_ON_AC = 0;
       CPU_MAX_PERF_ON_AC = 100;
       CPU_MIN_PERF_ON_BAT = 0;
-      CPU_MAX_PERF_ON_BAT = 20;
+      # Was 20: a ~900 MHz ceiling, under which streaming to Discord and
+      # films in the browser stuttered on battery (2026-11-08). 60 still
+      # keeps the boost clocks (and the heat) off, without the stutter.
+      CPU_MAX_PERF_ON_BAT = 60;
 
       # Wifi power saving only on battery. Plugged in, the radio dozing
       # between beacons showed up as 16% packet loss and 1.5 s spikes to the
