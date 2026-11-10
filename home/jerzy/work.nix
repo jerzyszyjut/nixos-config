@@ -8,7 +8,23 @@
 lib.mkIf osConfig.profiles.work.enable {
   home.packages = with pkgs; [
     # ---- GUI ---------------------------------------------------------------
-    vscode # keeping this as the GUI fallback; drop if nvim sticks
+    # Keeping this as the GUI fallback; drop if nvim sticks.
+    # VS Code 1.144 moved its bundled ripgrep to
+    # node_modules.asar.unpacked/@vscode/ripgrep-universal, and nixpkgs'
+    # patchPhase still `rm`s the old path, so the build failed (2026-11-10).
+    # Put a placeholder where nixpkgs expects it and point the real one at
+    # nixpkgs' ripgrep. Drop this override once nixpkgs catches up.
+    (vscode.overrideAttrs (old: {
+      postUnpack = (old.postUnpack or "") + ''
+        app=$sourceRoot/resources/app
+        if [ ! -e $app/node_modules/@vscode/ripgrep/bin/rg ]; then
+          mkdir -p $app/node_modules/@vscode/ripgrep/bin
+          touch $app/node_modules/@vscode/ripgrep/bin/rg
+          rg=$app/node_modules.asar.unpacked/@vscode/ripgrep-universal/bin/linux-x64/rg
+          [ -e $rg ] && ln -sf ${ripgrep}/bin/rg $rg
+        fi
+      '';
+    }))
     zed-editor # trying this out
     # Cursor dropped per your call.
 
