@@ -29,23 +29,6 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # JobPilot (job search copilot), for its NixOS module only; imported by
-    # hosts/kino/jobpilot.nix and by nothing else. The repository is
-    # PRIVATE: fetching it needs a GitHub token, which on kino lives in
-    # root's own nix.conf (access-tokens, outside this repo). Inputs are
-    # fetched lazily, so machines that never import it — the laptop — build
-    # without one. `nix flake update` does need it:
-    #   nix flake update --option access-tokens "github.com=$(gh auth token)"
-    jobpilot = {
-      url = "github:jerzyszyjut/jobpilot";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # Opportunity radar, for its NixOS module only; imported by
-    # hosts/kino/opportunity-radar.nix. Private like JobPilot, fetched with
-    # the same token. It has no inputs of its own.
-    opportunity-radar.url = "github:jerzyszyjut/opportunity-radar";
   };
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, nixos-hardware, stylix, sops-nix, ... }:

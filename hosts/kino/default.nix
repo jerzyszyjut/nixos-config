@@ -15,8 +15,6 @@
     # exist until you run, ON THIS MACHINE:
     #   nixos-generate-config --root /mnt   (then copy it here)
     ./hardware-configuration.nix
-    ./jobpilot.nix
-    ./opportunity-radar.nix
   ];
 
   networking.hostName = "kino";
@@ -298,7 +296,8 @@
   # A laptop running 24/7 in a dorm room: on 2026-10-01 someone pulled the
   # charger and nothing noticed until the battery was at 66%. This checks
   # once a minute and sends a Telegram message — through JobPilot's bot, whose
-  # token stays in its server-only env file — when the charger goes or comes
+  # token stays in its server-only env file (JobPilot itself was removed
+  # from this repo on 2026-11-10; the file and the bot remain) — when the charger goes or comes
   # back, the battery runs low, or the CPU or an SSD runs hot. Each condition
   # alerts once when it starts and once when it clears, never on every run.
   systemd.services.health-alert = {
