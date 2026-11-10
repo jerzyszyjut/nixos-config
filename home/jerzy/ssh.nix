@@ -87,12 +87,30 @@
         user = "git";
         identityFile = "~/.ssh/default";
       };
+
+      # TU Wien complang GitLab (course repos). Same story as kino: without an
+      # explicit identity ssh never offers ~/.ssh/default and the clone fails
+      # with "Permission denied (publickey)".
+      "b3.complang.tuwien.ac.at" = {
+        hostname = "b3.complang.tuwien.ac.at";
+        user = "git";
+        identityFile = "~/.ssh/default";
+        identitiesOnly = true;
+      };
     };
   };
 
   # ControlPath needs its directory to exist, and config.d is where tools that
   # insist on writing their own ssh config should be pointed.
   home.file.".ssh/config.d/.keep".text = "";
+
+  # Alias ~/.ssh/default under a default identity name so ssh offers it to
+  # every host (e.g. gitlab.tuwien.ac.at) without a per-host identityFile.
+  # Out-of-store symlinks: the private key must never be copied into /nix/store.
+  home.file.".ssh/id_ed25519".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.ssh/default";
+  home.file.".ssh/id_ed25519.pub".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.ssh/default.pub";
 
   # Remote-work toolkit.
   home.packages = with pkgs; [
