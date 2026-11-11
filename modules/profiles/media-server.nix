@@ -1827,7 +1827,9 @@ in
       # a CDN at page load. Offline you get placeholders, nothing breaks.
       services = [
         {
-          "Oglądanie" = [
+          # With SeerrFin, its tile stands in for both: browsing, watching
+          # and requesting all happen in Jellyfin's own UI then.
+          "Oglądanie" = lib.optionals (!cfg.seerrFinTile) [
             {
               "Jellyfin" = {
                 href = "http://${cfg.dashboardHost}:${toString ports.jellyfin}";
