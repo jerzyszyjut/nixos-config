@@ -22,8 +22,10 @@
   networking.hostName = "kino";
 
   # ---- Jellyfin 12 ---------------------------------------------------------
-  # kino runs Jellyfin 12 from unstable (since 2026-11-11), for the SeerrFin
-  # plugin, which needs 12.0 or later. dom stays on stable 10.11. The module
+  # kino runs Jellyfin 12 from unstable (since 2026-11-11). It came in for the
+  # SeerrFin plugin (needs 12.0+), which was tried and removed the same day;
+  # 12 stayed because going back means restoring the database. dom stays on
+  # stable 10.11. The module
   # comes from unstable as well: its encoding.xml has 12's keys
   # (QsvDevice, EnableDecodingColorDepth10Hevc), and forceEncodingConfig
   # rewrites that file on every start. Going back down means restoring the
@@ -31,9 +33,6 @@
   # /var/backup/jellyfin-10.11.11-2026-11-11.tar.zst.
   disabledModules = [ "services/misc/jellyfin.nix" ];
   services.jellyfin.package = pkgs.unstable.jellyfin;
-  # SeerrFin itself (and File Transformation, which it needs) were copied into
-  # /var/lib/jellyfin/plugins by hand; this only puts it on the dashboard.
-  profiles.mediaServer.seerrFinTile = true;
 
   # ---- filesystem options ------------------------------------------------
   # Same reasoning as hosts/thinkpad: nixos-generate-config records `subvol=`

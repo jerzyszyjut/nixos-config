@@ -296,12 +296,6 @@ in
       '';
     };
 
-    seerrFinTile = lib.mkEnableOption ''
-      a SeerrFin tile on the dashboard. SeerrFin is a Jellyfin plugin
-      (tabs for discovering and requesting through Seerr, and for importing
-      Letterboxd and Serializd watchlists), installed by hand into
-      /var/lib/jellyfin/plugins, so only hosts that have it should show it'';
-
     lanInterfaces = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ "wlan0" ];
@@ -1827,9 +1821,7 @@ in
       # a CDN at page load. Offline you get placeholders, nothing breaks.
       services = [
         {
-          # With SeerrFin, its tile stands in for both: browsing, watching
-          # and requesting all happen in Jellyfin's own UI then.
-          "Oglądanie" = lib.optionals (!cfg.seerrFinTile) [
+          "Oglądanie" = [
             {
               "Jellyfin" = {
                 href = "http://${cfg.dashboardHost}:${toString ports.jellyfin}";
@@ -1846,17 +1838,7 @@ in
                 icon = "jellyseerr.png";
               };
             }
-          ] ++ lib.optional cfg.seerrFinTile {
-              # Not a separate server: tabs inside Jellyfin. The monitor asks
-              # for one of the plugin's own files, so the dot goes red when the
-              # plugin is missing even though Jellyfin itself is up.
-              "SeerrFin" = {
-                href = "http://${cfg.dashboardHost}:${toString ports.jellyfin}/web/#/home";
-                siteMonitor = "http://localhost:${toString ports.jellyfin}/SeerrFin/seerrfin-letterboxd.js";
-                description = "Watchlisty Letterboxd i Serializd → Seerr (zakładki w Jellyfin)";
-                icon = "mdi-playlist-plus";
-              };
-            };
+          ];
         }
       ] ++ lib.optional (cfg.music.enable || cfg.books.enable) {
           "Słuchanie i czytanie" =
