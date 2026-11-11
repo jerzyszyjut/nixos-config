@@ -15,6 +15,7 @@
     # exist until you run, ON THIS MACHINE:
     #   nixos-generate-config --root /mnt   (then copy it here)
     ./hardware-configuration.nix
+    ./watchseerr.nix
     # Jellyfin 12's module; see "Jellyfin 12" below.
     "${inputs.nixpkgs-unstable}/nixos/modules/services/misc/jellyfin.nix"
   ];

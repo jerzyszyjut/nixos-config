@@ -29,6 +29,13 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # watchseerr: Letterboxd and Serializd watchlists to Seerr requests, in
+    # the background. Used by hosts/kino/watchseerr.nix only.
+    watchseerr = {
+      url = "github:jerzyszyjut/watchseerr";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, nixos-hardware, stylix, sops-nix, ... }:

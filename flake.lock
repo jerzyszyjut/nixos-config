@@ -276,7 +276,8 @@
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "sops-nix": "sops-nix",
-        "stylix": "stylix"
+        "stylix": "stylix",
+        "watchseerr": "watchseerr"
       }
     },
     "sops-nix": {
@@ -409,6 +410,26 @@
       "original": {
         "owner": "tinted-theming",
         "repo": "base16-zed",
+        "type": "github"
+      }
+    },
+    "watchseerr": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794427163,
+        "narHash": "sha256-Xjf0J94C/LakRLhqFAueRK0mh+CRMYyju3idYoaUhYc=",
+        "owner": "jerzyszyjut",
+        "repo": "watchseerr",
+        "rev": "04ce7e86fc4661f0cb340f048622f85dff168ff8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jerzyszyjut",
+        "repo": "watchseerr",
         "type": "github"
       }
     }
