@@ -37,7 +37,10 @@ lib.mkIf cfg.enable {
     # file opens in mpv as-is — original video, any subtitle format, 5.1.
     # Started by Hyprland (dotfiles/hypr/hyprland.conf); asks for the server
     # and login once, on first run.
-    jellyfin-mpv-shim
+    # From unstable: kino runs Jellyfin 12, which turned off the legacy
+    # api_key-in-the-URL login. 2.9 relied on it, so playback started and
+    # stopped after a few seconds (2026-11-12); 3.0+ works without it.
+    pkgs.unstable.jellyfin-mpv-shim
 
     # mpv is the one that opens instantly when you just want to play a file
     # off disk without a library in the way. vlc stays for the awkward formats
