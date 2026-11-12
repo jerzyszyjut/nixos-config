@@ -1510,6 +1510,29 @@ in
     hardware.graphics.enable = true;
     hardware.graphics.extraPackages = [ pkgs.intel-compute-runtime ];
 
+    # Dialogue over explosions. Whenever Jellyfin turns 5.1 into stereo (a
+    # browser, a phone), NightmodeDialogue lifts the centre channel, where
+    # the speech is, and turns the effects and the subwoofer down, so quiet
+    # talk and loud action land closer together. The NixOS module writes
+    # encoding.xml from scratch on every start (forceEncodingConfig) and
+    # knows no downmix keys, so they are set here, after it, rather than in
+    # the dashboard, which would be overwritten. Players that get the file
+    # untouched (mpv-shim) level the sound themselves; see
+    # home/jerzy/entertainment.nix.
+    systemd.services.jellyfin.preStart = lib.mkAfter ''
+      enc="${config.services.jellyfin.configDir}/encoding.xml"
+      if [ -f "$enc" ]; then
+        for kv in DownMixStereoAlgorithm=NightmodeDialogue DownMixAudioBoost=2; do
+          k=''${kv%%=*} v=''${kv#*=}
+          if grep -q "<$k>" "$enc"; then
+            sed -i "s|<$k>[^<]*</$k>|<$k>$v</$k>|" "$enc"
+          else
+            sed -i "s|</EncodingOptions>|  <$k>$v</$k>\n</EncodingOptions>|" "$enc"
+          fi
+        done
+      fi
+    '';
+
     # ---- Seerr (was Jellyseerr) ------------------------------------------
     # THE ONE YOU ACTUALLY OPEN. Radarr's UI is an admin tool — it asks about
     # quality profiles and release groups. Seerr sits in front of it and looks

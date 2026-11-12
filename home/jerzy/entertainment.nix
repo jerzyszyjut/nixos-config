@@ -59,6 +59,25 @@ lib.mkIf cfg.enable {
     discord
   ];
 
+  # mpv-shim plays the file untouched, so Jellyfin's dialogue-friendly
+  # downmix (media-server.nix) never reaches it; mpv levels the sound
+  # itself. dynaudnorm turns loud scenes down and quiet ones up over a ~15 s
+  # window, without the lag of a two-pass loudness filter. `n` switches it
+  # off and on, for a film where the dynamics are the point. Both files were
+  # empty when this took them over.
+  xdg.configFile."jellyfin-mpv-shim/mpv.conf" = {
+    force = true;
+    text = ''
+      af=@norm:lavfi=[dynaudnorm=f=500:g=31:p=0.5:m=5]
+    '';
+  };
+  xdg.configFile."jellyfin-mpv-shim/input.conf" = {
+    force = true;
+    text = ''
+      n af toggle @norm ; show-text "Wyrównywanie głośności: przełączone"
+    '';
+  };
+
   # `media` and `seerr` are the two you will actually type: the dashboard and
   # the place you add a film. The admin UIs (Radarr, Prowlarr, qBittorrent)
   # are bound to the server's loopback and are NOT reachable from here — ssh
