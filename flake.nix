@@ -84,7 +84,12 @@
         in
         {
           spotify = noVulkan "spotify" [ "spotify" ] prev.spotify;
-          obsidian = noVulkan "obsidian" [ "obsidian" ] prev.obsidian;
+          # Electron 44, not nixpkgs' default 43.8.3: under 43 the renderer
+          # dies on start ("i.webFrame[t] is not a function") and every
+          # window stays black, Obsidian 1.13 and 1.15 alike (2026-11-13).
+          # Drop the override once the default electron moves past 43.
+          obsidian = noVulkan "obsidian" [ "obsidian" ]
+            (prev.obsidian.override { electron = prev.electron_44; });
           discord = noVulkan "discord" [ "discord" "Discord" ] prev.discord;
         };
 
