@@ -90,6 +90,12 @@ in
         "bluez5.enable-sbc-xq" = true;
         "bluez5.enable-msbc" = true;
         "bluez5.enable-hw-volume" = true;
+        # No LDAC. At up to 990 kbit/s it dropped out every few seconds on
+        # the XM5s while the Keychron and the MX Vertical share the same
+        # Bluetooth radio (2026-11-13); AAC plays without gaps and sounds
+        # the same on them. Without LDAC in the list, AAC is the best codec
+        # left, so it is what gets negotiated.
+        "bluez5.codecs" = [ "sbc" "sbc_xq" "aac" ];
         "bluez5.roles" = [ "a2dp_sink" "a2dp_source" "hsp_hs" "hsp_ag" "hfp_hf" "hfp_ag" ];
       };
     };
