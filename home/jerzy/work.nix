@@ -41,6 +41,9 @@ lib.mkIf osConfig.profiles.work.enable {
     # You have ~/.claude and ~/.claude.json already. Pairs with
     # coder/claudecode.nvim — see the notes at the bottom of apps.nix.
     unstable.claude-code
+    # `cs`: several Claude Code sessions at once, each in its own tmux
+    # session and git worktree. Packaged in pkgs/claude-squad.
+    (callPackage ../../pkgs/claude-squad { })
 
     # ---- languages & package managers --------------------------------------
     uv # your Python workflow; works because of nix-ld in profiles/work.nix
